@@ -94,7 +94,6 @@ class SpineAutomation:
             "confidence_threshold": 0.8,  # 图像匹配置信度
             "max_retries": 3,  # 最大重试次数
             "debug_mode": True,  # 调试模式，显示详细信息
-            "force_click": True,  # 是否使用强制点击（AppleScript）
             "tree_region": {  # 树区域 (x, y, width, height)
                 "x": 0,
                 "y": 0, 
@@ -309,15 +308,14 @@ class SpineAutomation:
             self.logger.error(f"模板匹配失败: {e}")
             return None
     
-    def click_at_position(self, x: int, y: int, window_region: Optional[Tuple[int, int, int, int]] = None, force_click: bool = True):
+    def click_at_position(self, x: int, y: int, window_region: Optional[Tuple[int, int, int, int]] = None):
         """
-        在指定位置点击（改进版本，支持强制点击）
+        在指定位置点击
         
         Args:
             x: 相对于截图区域的x坐标
             y: 相对于截图区域的y坐标
             window_region: 窗口区域，用于坐标转换
-            force_click: 是否使用强制点击（通过AppleScript）
         """
 
         try:
@@ -340,26 +338,14 @@ class SpineAutomation:
             if not self.activate_spine_window():
                 self.logger.warning("窗口激活可能失败，但继续尝试点击")
             
-            # 方法1: 使用pyautogui点击
-            if not force_click:
+            # 使用pyautogui点击
                 # 先移动鼠标到目标位置
-                pyautogui.moveTo(click_x , click_y, duration=0.2)
-                time.sleep(0.1)
-                
-                # 执行点击
-                pyautogui.click(click_x, click_y)
-                self.logger.info(f"PyAutoGUI点击完成: ({click_x}, {click_y})")
-                
-            else:
-                # 方法2: 使用AppleScript强制点击（更可靠）
-                success = self.force_click_with_applescript(click_x, click_y)
-                if not success:
-                    # 如果AppleScript失败，回退到pyautogui
-                    self.logger.warning("AppleScript点击失败，回退到PyAutoGUI")
-                    pyautogui.moveTo(click_x, click_y, duration=0.2)
-                    time.sleep(0.1)
-                    pyautogui.click(click_x, click_y)
-                    self.logger.info(f"PyAutoGUI备用点击完成: ({click_x}, {click_y})")
+            pyautogui.moveTo(click_x , click_y, duration=0.2)
+            time.sleep(0.1)
+            
+            # 执行点击
+            pyautogui.click(click_x, click_y)
+            self.logger.info(f"PyAutoGUI点击完成: ({click_x}, {click_y})")
             
             time.sleep(self.config["click_delay"])
             
@@ -371,59 +357,6 @@ class SpineAutomation:
                 self.logger.info("紧急恢复点击已执行")
             except:
                 pass
-    
-    def force_click_with_applescript(self, x: int, y: int) -> bool:
-        """
-        使用AppleScript执行强制点击
-        
-        Args:
-            x: 屏幕x坐标
-            y: 屏幕y坐标
-            
-        Returns:
-            点击是否成功
-        """
-        try:
-            import subprocess
-            
-            # 获取应用程序名称
-            app_name = self.config.get("app_name", "Spine")
-            
-            # 使用AppleScript进行点击
-            click_script = f'''
-            try
-                tell application "System Events"
-                    -- 确保Spine处于前台
-                    tell application "{app_name}" to activate
-                    delay 0.3
-                    
-                    -- 执行点击
-                    click at {{{x}, {y}}}
-                    delay 0.1
-                end tell
-                return "success"
-            on error errMsg
-                return "error: " & errMsg
-            end try
-            '''
-            
-            result = subprocess.run(['osascript', '-e', click_script], 
-                                   capture_output=True, text=True, timeout=3)
-            
-            if result.returncode == 0 and "success" in result.stdout:
-                self.logger.info(f"AppleScript点击成功: ({x}, {y})")
-                return True
-            else:
-                error_msg = result.stderr if result.stderr else result.stdout
-                self.logger.warning(f"AppleScript点击失败: {error_msg}")
-                return False
-                
-        except subprocess.TimeoutExpired:
-            self.logger.error("AppleScript点击超时")
-            return False
-        except Exception as e:
-            self.logger.error(f"AppleScript点击异常: {e}")
-            return False
     
     def check_accessibility_permissions(self):
         """检查辅助功能权限"""
@@ -631,8 +564,7 @@ class SpineAutomation:
             # 使用配置中的点击方式
             self.click_at_position(
                 filter_pos[0], filter_pos[1], 
-                window_region, 
-                force_click=False
+                window_region
             )
             
             # 调试模式下额外检查
@@ -668,8 +600,7 @@ class SpineAutomation:
             
             self.click_at_position(
                 grid_pos[0], grid_pos[1], 
-                window_region,
-                force_click=self.config.get("force_click", True)
+                window_region
             )
             
             if self.config.get("debug_mode", False):
@@ -702,8 +633,7 @@ class SpineAutomation:
             
             self.click_at_position(
                 attachment_pos[0], attachment_pos[1], 
-                window_region,
-                force_click=self.config.get("force_click", True)
+                window_region
             )
             
             if self.config.get("debug_mode", False):
@@ -850,18 +780,10 @@ class SpineAutomation:
             print("🔍 3秒后开始测试点击...")
             time.sleep(3)
             
-            # 测试AppleScript点击
-            print("测试AppleScript点击...")
-            success = self.force_click_with_applescript(center_x, center_y)
-            if success:
-                print("✅ AppleScript点击测试成功")
-            else:
-                print("❌ AppleScript点击测试失败")
-                
-                # 尝试pyautogui点击
-                print("测试PyAutoGUI点击...")
-                pyautogui.click(center_x, center_y)
-                print("✅ PyAutoGUI点击测试完成")
+            # 测试PyAutoGUI点击
+            print("测试PyAutoGUI点击...")
+            pyautogui.click(center_x, center_y)
+            print("✅ PyAutoGUI点击测试完成")
                 
         except Exception as e:
             print(f"❌ 点击功能测试失败: {e}")
