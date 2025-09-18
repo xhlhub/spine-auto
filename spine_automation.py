@@ -496,11 +496,11 @@ except Exception as e:
             screenshot_cv = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
 
             # 新增：将截图保存为本地图片，文件名带时间戳
-            import datetime
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            save_path = f"screenshot_{name}_{timestamp}.png"
-            cv2.imwrite(save_path, screenshot_cv)
-            self.logger.info(f"截图已保存到本地: {save_path}")
+            # import datetime
+            # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            # save_path = f"screenshot_{name}_{timestamp}.png"
+            # cv2.imwrite(save_path, screenshot_cv)
+            # self.logger.info(f"截图已保存到本地: {save_path}")
 
             return screenshot_cv
             
@@ -994,6 +994,8 @@ except Exception as e:
             self.logger.info(f"PyAutoGUI点击完成: ({click_x}, {click_y})")
             
             time.sleep(self.config["click_delay"])
+
+            return [click_x, click_y]
             
         except Exception as e:
             self.logger.error(f"点击失败: {e}")
@@ -1179,12 +1181,13 @@ except Exception as e:
                 return
             
             # 步骤3: 点击附件节点
-            if not self.click_attachment_node(window_region):
+            attachment_pos = self.click_attachment_node(window_region)
+            if attachment_pos is None:
                 self.logger.error("点击附件节点失败")
                 return
             
             # 步骤4: 循环点击附件子节点
-            self.process_attachment_subnodes(window_region)
+            self.process_attachment_subnodes(attachment_pos, window_region)
             
         except Exception as e:
             self.logger.error(f"自动化流程执行失败: {e}")
@@ -1259,8 +1262,8 @@ except Exception as e:
             self.logger.error(f"点击网格菜单选项失败: {e}")
             return False
     
-    def click_attachment_node(self, window_region: Optional[Tuple[int, int, int, int]] = None) -> bool:
-        """点击附件节点"""
+    def click_attachment_node(self, window_region: Optional[Tuple[int, int, int, int]] = None) -> Optional[Tuple[int, int]]:
+        """点击附件节点并返回节点位置"""
         self.logger.info("步骤3: 点击附件节点")
         
         try:
@@ -1268,14 +1271,14 @@ except Exception as e:
             time.sleep(0.5)
             screenshot = self.take_screenshot(window_region)
             if screenshot is None:
-                return False
+                return None
             
             attachment_template = str(self.templates_dir / "attachment_node.png")
             attachment_pos = self.find_template(screenshot, attachment_template, self.config["confidence_threshold"])
             
             if attachment_pos is None:
                 self.logger.warning("未找到附件节点")
-                return False
+                return None
             
             self.click_at_position(
                 attachment_pos[0], attachment_pos[1], 
@@ -1286,13 +1289,13 @@ except Exception as e:
                 self.logger.info("附件节点点击完成，等待子节点展开...")
                 
             time.sleep(self.config["operation_delay"])  # 等待子节点展开
-            return True
+            return attachment_pos
             
         except Exception as e:
             self.logger.error(f"点击附件节点失败: {e}")
-            return False
+            return None
     
-    def process_attachment_subnodes(self, window_region: Optional[Tuple[int, int, int, int]] = None):
+    def process_attachment_subnodes(self, attachment_pos: Tuple[int, int], window_region: Optional[Tuple[int, int, int, int]] = None):
         """处理附件子节点"""
         self.logger.info("步骤4: 开始处理附件子节点")
         
@@ -1304,7 +1307,7 @@ except Exception as e:
                 self.logger.warning(f"子节点模板不存在: {subnode_template}")
                 continue
             
-            success = self.click_subnode(str(subnode_template), window_region)
+            success = self.click_subnode(attachment_pos, window_region)
             
             if success:
                 self.logger.info(f"成功处理子节点: {subnode_name}")
@@ -1314,21 +1317,29 @@ except Exception as e:
             # 子节点操作间隔
             time.sleep(self.config["operation_delay"])
     
-    def click_subnode(self, subnode_template: str, window_region: Optional[Tuple[int, int, int, int]] = None) -> bool:
-        """点击单个子节点"""
+    def click_subnode(self, attachment_pos: Tuple[int, int], window_region: Optional[Tuple[int, int, int, int]] = None) -> bool:
+        """循环点击子节点"""
         try:
-            screenshot = self.take_screenshot(window_region)
-            if screenshot is None:
-                return False
+            node_height = self.config.get("node_height", 20)
+            success_count = 0
             
-            subnode_pos = self.find_template(screenshot, subnode_template, self.config["confidence_threshold"])
+            # 循环点击3次
+            for i in range(3):
+                # 计算当前子节点的y坐标
+                current_y = attachment_pos[1] + (i + 1) * node_height * self.dpr
+                click_pos = (attachment_pos[0], current_y)
+                
+                self.logger.info(f"点击子节点 {i+1}/3，坐标: ({click_pos[0]}, {click_pos[1]})")
+                
+                try:
+                    self.click_at_position(click_pos[0], click_pos[1], window_region)
+                    success_count += 1
+                    time.sleep(self.config["click_delay"])
+                except Exception as e:
+                    self.logger.warning(f"点击子节点 {i+1} 失败: {e}")
             
-            if subnode_pos is None:
-                self.logger.debug(f"未找到子节点模板: {subnode_template}")
-                return False
-            
-            self.click_at_position(subnode_pos[0], subnode_pos[1], window_region)
-            return True
+            self.logger.info(f"子节点点击完成，成功 {success_count}/3 次")
+            return success_count > 0
             
         except Exception as e:
             self.logger.error(f"点击子节点失败: {e}")
