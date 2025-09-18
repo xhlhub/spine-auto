@@ -344,28 +344,27 @@ class AutomationRunner:
                     # 1. 点击勾选网格
                     if self.click_grid_check(window_region):
                         self.logger.info(f"子节点 {i+1}: 勾选网格成功")
+                        
+                        # 2. 点击编辑网格
+                        if self.click_grid_edit(window_region):
+                            self.logger.info(f"子节点 {i+1}: 编辑网格成功")
+                            
+                            # 3. 点击描绘
+                            if self.click_grid_draw(window_region):
+                                self.logger.info(f"子节点 {i+1}: 描绘成功")
+                                
+                                # 4. 点击确定
+                                if self.click_draw_sure(window_region):
+                                    self.logger.info(f"子节点 {i+1}: 确定成功")
+                                    self.logger.info(f"子节点 {i+1} 的网格操作流程完成")
+                                else:
+                                    self.logger.warning(f"子节点 {i+1}: 确定失败，流程中断")
+                            else:
+                                self.logger.warning(f"子节点 {i+1}: 描绘失败，流程中断")
+                        else:
+                            self.logger.warning(f"子节点 {i+1}: 编辑网格失败，流程中断")
                     else:
-                        self.logger.warning(f"子节点 {i+1}: 勾选网格失败")
-                    
-                    # 2. 点击编辑网格
-                    if self.click_grid_edit(window_region):
-                        self.logger.info(f"子节点 {i+1}: 编辑网格成功")
-                    else:
-                        self.logger.warning(f"子节点 {i+1}: 编辑网格失败")
-                    
-                    # 3. 点击描绘
-                    if self.click_grid_draw(window_region):
-                        self.logger.info(f"子节点 {i+1}: 描绘成功")
-                    else:
-                        self.logger.warning(f"子节点 {i+1}: 描绘失败")
-                    
-                    # 4. 点击确定
-                    if self.click_draw_sure(window_region):
-                        self.logger.info(f"子节点 {i+1}: 确定成功")
-                    else:
-                        self.logger.warning(f"子节点 {i+1}: 确定失败")
-                    
-                    self.logger.info(f"子节点 {i+1} 的网格操作流程完成")
+                        self.logger.warning(f"子节点 {i+1}: 勾选网格失败，流程中断")
                     
                 except Exception as e:
                     self.logger.warning(f"点击子节点 {i+1} 失败: {e}")

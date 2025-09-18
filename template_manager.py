@@ -179,7 +179,7 @@ class TemplateManager:
                 best_confidence = current_confidence
                 best_location = current_loc
                 best_method = method_name
-        
+        print("confidence: " + str(confidence))
         if best_confidence >= confidence and best_location is not None:
             template_h, template_w = template.shape[:2]
             center_x = best_location[0] + template_w // 2
