@@ -134,7 +134,7 @@ class AutomationRunner:
                 return False
             
             if isImgProcess:
-                filter_template = str(self.template_manager.templates_dir / "img_filter_icon_grid.png")
+                filter_template = str(self.template_manager.templates_dir / "img_filter_icon.png")
             else:
                 filter_template = str(self.template_manager.templates_dir / "grid_filter_icon.png")
 
@@ -349,7 +349,11 @@ class AutomationRunner:
             # 循环直到连续2次网格检查失败
             while consecutive_failures < 2:
                 # 计算当前子节点的y坐标
-                current_y = attachment_pos[1] + (i + 1) * node_height * self.click_manager.dpr
+                if isImgProcess:
+                    current_y = attachment_pos[1] + node_height * self.click_manager.dpr
+                else:
+                    current_y = attachment_pos[1] + (i + 1) * node_height * self.click_manager.dpr
+
                 click_pos = (attachment_pos[0], current_y)
                 
                 self.logger.info(f"点击子节点 {i+1}，坐标: ({click_pos[0]}, {click_pos[1]})")
@@ -360,15 +364,25 @@ class AutomationRunner:
                     success_count += 1
                     time.sleep(self.config_manager.get("click_delay", 5.0))
                     
-                    # 在每次点击子节点后，执行4个依次的点击流程
-                    self.logger.info(f"开始执行子节点 {i+1} 的网格操作流程")
+                    # 在每次点击子节点后，根据isImgProcess参数执行不同的网格操作流程
+                    is_img_process = self.config_manager.get("isImgProcess", False)
+                    self.logger.info(f"开始执行子节点 {i+1} 的网格操作流程 (isImgProcess: {is_img_process})")
                     
-                    # 1. 点击勾选网格 - 根据此结果判断是否继续循环
-                    grid_check_result = self.click_grid_check(window_region)
-                    if grid_check_result:
-                        self.logger.info(f"子节点 {i+1}: 勾选网格成功")
-                        consecutive_failures = 0  # 重置连续失败计数器
-                        
+                    if is_img_process:
+                        # isImgProcess=true: 只执行点击勾选网格
+                        self.logger.info(f"子节点 {i+1}: 执行图像处理模式 - 仅勾选网格")
+                        grid_check_result = self.click_grid_check(window_region)
+                        if grid_check_result:
+                            self.logger.info(f"子节点 {i+1}: 勾选网格成功")
+                            consecutive_failures = 0  # 重置连续失败计数器
+                            self.logger.info(f"子节点 {i+1} 的图像处理流程完成")
+                        else:
+                            self.logger.warning(f"子节点 {i+1}: 勾选网格失败")
+                            consecutive_failures += 1  # 增加连续失败计数
+                            self.logger.info(f"连续失败次数: {consecutive_failures}/2")
+                    else:
+                        # isImgProcess=false: 执行完整的网格操作流程
+                        self.logger.info(f"子节点 {i+1}: 执行完整网格操作模式")
                         # 2. 点击编辑网格
                         if self.click_grid_edit(window_region):
                             self.logger.info(f"子节点 {i+1}: 编辑网格成功")
@@ -380,17 +394,15 @@ class AutomationRunner:
                                 # 4. 点击确定
                                 if self.click_draw_sure(window_region):
                                     self.logger.info(f"子节点 {i+1}: 确定成功")
-                                    self.logger.info(f"子节点 {i+1} 的网格操作流程完成")
+                                    self.logger.info(f"子节点 {i+1} 的完整网格操作流程完成")
                                 else:
                                     self.logger.warning(f"子节点 {i+1}: 确定失败，流程中断")
                             else:
                                 self.logger.warning(f"子节点 {i+1}: 描绘失败，流程中断")
                         else:
                             self.logger.warning(f"子节点 {i+1}: 编辑网格失败，流程中断")
-                    else:
-                        self.logger.warning(f"子节点 {i+1}: 勾选网格失败")
-                        consecutive_failures += 1  # 增加连续失败计数
-                        self.logger.info(f"连续失败次数: {consecutive_failures}/2")
+                            consecutive_failures += 1  # 增加连续失败计数
+                            self.logger.info(f"连续失败次数: {consecutive_failures}/2")
                     
                 except Exception as e:
                     self.logger.warning(f"点击子节点 {i+1} 失败: {e}")

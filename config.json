@@ -24,5 +24,6 @@
     "height": 200
   },
   "node_height": 22,
-  "app_name": "Spine Trial"
+  "app_name": "Spine Trial",
+  "isImgProcess": false
 }
