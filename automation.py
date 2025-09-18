@@ -76,13 +76,15 @@ class AutomationRunner:
         
         # 执行主要流程
         try:
+            #图片勾选☑️网格流程
+
             # 步骤1: 点击筛选图标
-            if not self.click_filter_icon(window_region):
+            if not self.click_filter_icon(window_region, isImgProcess=True):
                 self.logger.error("点击筛选图标失败")
                 return
             
             # 步骤2: 点击网格菜单选项
-            if not self.click_grid_menu_option(window_region):
+            if not self.click_grid_menu_option(window_region, isImgProcess=True):
                 self.logger.error("点击网格菜单选项失败")
                 return
             
@@ -93,14 +95,36 @@ class AutomationRunner:
                 return
             
             # 步骤4: 循环点击附件子节点
-            self.process_attachment_subnodes(attachment_pos, window_region)
+            self.process_attachment_subnodes(attachment_pos, window_region, isImgProcess=True)
+
+            #网格编辑流程
+            # 步骤1: 点击筛选图标
+            if not self.click_filter_icon(window_region, isImgProcess=False):
+                self.logger.error("点击筛选图标失败")
+                return
+            
+            # 步骤2: 点击网格菜单选项
+            if not self.click_grid_menu_option(window_region, isImgProcess=False):
+                self.logger.error("点击网格菜单选项失败")
+                return
+            
+            # 步骤3: 点击附件节点
+            attachment_pos = self.click_attachment_node(window_region)
+            if attachment_pos is None:
+                self.logger.error("点击附件节点失败")
+                return
+            
+            # 步骤4: 循环点击附件子节点
+            self.process_attachment_subnodes(attachment_pos, window_region, isImgProcess=False)            
+
+
             
         except Exception as e:
             self.logger.error(f"自动化流程执行失败: {e}")
         
         self.logger.info("自动化流程完成")
     
-    def click_filter_icon(self, window_region: Optional[Tuple[int, int, int, int]] = None) -> bool:
+    def click_filter_icon(self, window_region: Optional[Tuple[int, int, int, int]] = None, isImgProcess: bool = False) -> bool:
         """点击筛选图标"""
         self.logger.info("步骤1: 点击筛选图标")
         
@@ -109,7 +133,11 @@ class AutomationRunner:
             if screenshot is None:
                 return False
             
-            filter_template = str(self.template_manager.templates_dir / "img_filter_icon.png")
+            if isImgProcess:
+                filter_template = str(self.template_manager.templates_dir / "img_filter_icon_grid.png")
+            else:
+                filter_template = str(self.template_manager.templates_dir / "grid_filter_icon.png")
+
             filter_pos = self.template_manager.find_template(
                 screenshot, 
                 filter_template, 
@@ -141,7 +169,7 @@ class AutomationRunner:
             self.logger.error(f"点击筛选图标失败: {e}")
             return False
     
-    def click_grid_menu_option(self, window_region: Optional[Tuple[int, int, int, int]] = None) -> bool:
+    def click_grid_menu_option(self, window_region: Optional[Tuple[int, int, int, int]] = None, isImgProcess: bool = False) -> bool:
         """点击下拉菜单中的网格选项"""
         self.logger.info("步骤2: 点击网格菜单选项")
         
@@ -152,7 +180,11 @@ class AutomationRunner:
             if screenshot is None:
                 return False
             
-            grid_menu_template = str(self.template_manager.templates_dir / "img_menu_option.png")
+            if isImgProcess:
+                grid_menu_template = str(self.template_manager.templates_dir / "img_menu_option.png")
+            else:
+                grid_menu_template = str(self.template_manager.templates_dir / "grid_menu_option.png")
+
             grid_pos = self.template_manager.find_template(
                 screenshot, 
                 grid_menu_template, 
@@ -295,18 +327,18 @@ class AutomationRunner:
             self.logger.error(f"智能检查并点击附件节点失败: {e}")
             return None
     
-    def process_attachment_subnodes(self, attachment_pos: Tuple[int, int], window_region: Optional[Tuple[int, int, int, int]] = None):
+    def process_attachment_subnodes(self, attachment_pos: Tuple[int, int], window_region: Optional[Tuple[int, int, int, int]] = None, isImgProcess: bool = False):
         """处理附件子节点"""
         self.logger.info("步骤4: 开始处理附件子节点")
         
-        success = self.click_subnode(attachment_pos, window_region)
+        success = self.click_subnode(attachment_pos, window_region, isImgProcess)
         
         if success:
             self.logger.info("成功处理附件子节点")
         else:
             self.logger.warning("处理附件子节点失败")
     
-    def click_subnode(self, attachment_pos: Tuple[int, int], window_region: Optional[Tuple[int, int, int, int]] = None) -> bool:
+    def click_subnode(self, attachment_pos: Tuple[int, int], window_region: Optional[Tuple[int, int, int, int]] = None, isImgProcess: bool = False) -> bool:
         """循环点击子节点"""
         try:
             node_height = self.config_manager.get("node_height", 20)
