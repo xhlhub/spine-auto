@@ -364,11 +364,9 @@ class AutomationRunner:
                     success_count += 1
                     time.sleep(self.config_manager.get("click_delay", 5.0))
                     
-                    # 在每次点击子节点后，根据isImgProcess参数执行不同的网格操作流程
-                    is_img_process = self.config_manager.get("isImgProcess", False)
-                    self.logger.info(f"开始执行子节点 {i+1} 的网格操作流程 (isImgProcess: {is_img_process})")
+                    self.logger.info(f"开始执行子节点 {i+1} 的网格操作流程 (isImgProcess: {isImgProcess})")
                     
-                    if is_img_process:
+                    if isImgProcess:
                         # isImgProcess=true: 只执行点击勾选网格
                         self.logger.info(f"子节点 {i+1}: 执行图像处理模式 - 仅勾选网格")
                         grid_check_result = self.click_grid_check(window_region)

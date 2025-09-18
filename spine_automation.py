@@ -22,7 +22,7 @@ from automation import AutomationRunner
 
 # 配置pyautogui
 pyautogui.FAILSAFE = True  # 鼠标移到左上角停止
-pyautogui.PAUSE = 0.5  # 操作间隔
+pyautogui.PAUSE = 0.2  # 操作间隔
 
 
 @dataclass
