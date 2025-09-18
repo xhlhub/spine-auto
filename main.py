@@ -52,7 +52,7 @@ def main():
                 print("❌ 辅助功能权限不足")
         elif choice == "6":
             # 分析模板质量
-            template_files = ["filter_icon.png", "grid_menu_option.png", "attachment_node.png"]
+            template_files = ["img_filter_icon.png", "img_menu_option.png", "attachment_node.png"]
             print("\n=== 模板质量分析 ===")
             for template_file in template_files:
                 template_path = automation.template_manager.templates_dir / template_file

@@ -69,21 +69,6 @@ class ConfigManager:
                 "width": 800,
                 "height": 200
             },
-            "attachment_subnodes": [  # 要点击的附件子节点名称列表
-                "raptor-body",
-                "raptor-back-arm", 
-                "raptor-front-leg",
-                "raptor-hindleg-back",
-                "raptor-horn",
-                "raptor-jaw",
-                "raptor-jaw2",
-                "raptor-jaw-tooth",
-                "raptor-mouth-inside",
-                "raptor-saddle-w-shadow",
-                "raptor-tail-shadow", 
-                "raptor-tongue",
-                "stirrup-strap"
-            ]
         }
         self.save_config()
         self.logger.info("已创建默认配置文件")

@@ -457,8 +457,8 @@ class TemplateManager:
         """
         try:
             template_files = [
-                "filter_icon.png",
-                "grid_menu_option.png", 
+                "img_filter_icon.png",
+                "img_menu_option.png", 
                 "attachment_node.png"
             ]
             

@@ -49,8 +49,8 @@ pip install pyobjc-framework-Quartz
 3. 手动截取以下模板图片并保存到 `templates/` 文件夹：
 
    **核心流程模板：**
-   - `filter_icon.png` - 筛选图标（漏斗形状）的截图
-   - `grid_menu_option.png` - 下拉菜单中"网格"选项的截图
+   - `img_filter_icon.png` - 筛选图标（漏斗形状）的截图
+   - `img_menu_option.png` - 下拉菜单中"网格"选项的截图
    - `attachment_node.png` - 左侧树中"附件"节点的截图
 
    **附件子节点模板：**
@@ -79,21 +79,6 @@ pip install pyobjc-framework-Quartz
   "operation_delay": 2.0,
   "confidence_threshold": 0.8,
   "max_retries": 3,
-  "attachment_subnodes": [
-    "raptor-body",
-    "raptor-back-arm", 
-    "raptor-front-leg",
-    "raptor-hindleg-back",
-    "raptor-horn",
-    "raptor-jaw",
-    "raptor-jaw2",
-    "raptor-jaw-tooth",
-    "raptor-mouth-inside",
-    "raptor-saddle-w-shadow",
-    "raptor-tail-shadow",
-    "raptor-tongue",
-    "stirrup-strap"
-  ]
 }
 ```
 
@@ -119,7 +104,6 @@ pip install pyobjc-framework-Quartz
 | `operation_delay` | float | 完成一个节点操作后的等待时间(秒) | 2.0 |
 | `confidence_threshold` | float | 图像匹配置信度阈值 | 0.8 |
 | `max_retries` | int | 操作失败最大重试次数 | 3 |
-| `attachment_subnodes` | array | 要点击的附件子节点名称列表 | 见上方示例 |
 
 ## 模板制作指南
 
@@ -128,12 +112,12 @@ pip install pyobjc-framework-Quartz
 - **唯一性**: 确保模板在界面中是唯一的
 - **稳定性**: 选择不会频繁变化的UI元素
 
-### 2. 筛选图标模板 (filter_icon.png)
+### 2. 筛选图标模板 (img_filter_icon.png)
 - 截取工具栏中的筛选图标（漏斗形状）
 - 包含图标的完整外观和边框
 - 建议尺寸：30x30像素左右
 
-### 3. 网格菜单选项模板 (grid_menu_option.png)
+### 3. 网格菜单选项模板 (img_menu_option.png)
 - 截取下拉菜单中的"网格"文字选项
 - 包含完整的文字和背景
 - 建议尺寸：60x25像素左右
@@ -201,11 +185,10 @@ pip install pyobjc-framework-Quartz
 
 如需添加更多自动化功能，可以扩展以下部分：
 
-1. **添加更多子节点**: 在config.json的attachment_subnodes中添加新的子节点名称
-2. **自定义操作序列**: 修改SpineAutomation类的run_automation方法
-3. **添加键盘操作**: 使用pyautogui的键盘功能
-4. **批处理多个文件**: 扩展文件管理功能
-5. **支持其他附件类型**: 修改脚本支持不同的附件节点
+1. **自定义操作序列**: 修改SpineAutomation类的run_automation方法
+2. **添加键盘操作**: 使用pyautogui的键盘功能
+3. **批处理多个文件**: 扩展文件管理功能
+4. **支持其他附件类型**: 修改脚本支持不同的附件节点
 
 ## 版本信息
 

@@ -58,8 +58,8 @@ class AutomationRunner:
         
         # 检查必需的模板文件
         required_templates = [
-            "filter_icon.png",
-            "grid_menu_option.png", 
+            "img_filter_icon.png",
+            "img_menu_option.png", 
             "attachment_node.png"
         ]
         
@@ -109,7 +109,7 @@ class AutomationRunner:
             if screenshot is None:
                 return False
             
-            filter_template = str(self.template_manager.templates_dir / "filter_icon.png")
+            filter_template = str(self.template_manager.templates_dir / "img_filter_icon.png")
             filter_pos = self.template_manager.find_template(
                 screenshot, 
                 filter_template, 
@@ -152,7 +152,7 @@ class AutomationRunner:
             if screenshot is None:
                 return False
             
-            grid_menu_template = str(self.template_manager.templates_dir / "grid_menu_option.png")
+            grid_menu_template = str(self.template_manager.templates_dir / "img_menu_option.png")
             grid_pos = self.template_manager.find_template(
                 screenshot, 
                 grid_menu_template, 
@@ -299,24 +299,12 @@ class AutomationRunner:
         """处理附件子节点"""
         self.logger.info("步骤4: 开始处理附件子节点")
         
-        attachment_subnodes = self.config_manager.get("attachment_subnodes", [])
-        for i, subnode_name in enumerate(attachment_subnodes):
-            self.logger.info(f"处理子节点 {i+1}/{len(attachment_subnodes)}: {subnode_name}")
-            
-            subnode_template = self.template_manager.templates_dir / f"{subnode_name}.png"
-            if not subnode_template.exists():
-                self.logger.warning(f"子节点模板不存在: {subnode_template}")
-                continue
-            
-            success = self.click_subnode(attachment_pos, window_region)
-            
-            if success:
-                self.logger.info(f"成功处理子节点: {subnode_name}")
-            else:
-                self.logger.warning(f"处理子节点失败: {subnode_name}")
-            
-            # 子节点操作间隔
-            time.sleep(self.config_manager.get("operation_delay", 2.0))
+        success = self.click_subnode(attachment_pos, window_region)
+        
+        if success:
+            self.logger.info("成功处理附件子节点")
+        else:
+            self.logger.warning("处理附件子节点失败")
     
     def click_subnode(self, attachment_pos: Tuple[int, int], window_region: Optional[Tuple[int, int, int, int]] = None) -> bool:
         """循环点击子节点"""
@@ -520,14 +508,10 @@ class AutomationRunner:
         print("请按照提示手动截取模板图片并保存到templates文件夹中")
         print(f"模板保存路径: {self.template_manager.templates_dir.absolute()}")
         print("\n需要的模板:")
-        print("1. filter_icon.png - 筛选图标（漏斗形状）的截图")
-        print("2. grid_menu_option.png - 下拉菜单中'网格'选项的截图")
+        print("1. img_filter_icon.png - 筛选图标（漏斗形状）的截图")
+        print("2. img_menu_option.png - 下拉菜单中'网格'选项的截图")
         print("3. attachment_node.png - '附件'节点的截图")
         
-        print("\n附件子节点模板:")
-        attachment_subnodes = self.config_manager.get("attachment_subnodes", [])
-        for i, node_name in enumerate(attachment_subnodes, 4):
-            print(f"{i}. {node_name}.png - {node_name}子节点的截图")
         
         print("\n请手动创建这些模板文件后，按回车继续...")
         input()
