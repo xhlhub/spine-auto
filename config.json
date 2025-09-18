@@ -1,0 +1,34 @@
+{
+  "window_title": "Spine Trial Spine",
+  "click_delay": 1.0,
+  "operation_delay": 2.0,
+  "confidence_threshold": 0.8,
+  "max_retries": 3,
+  "tree_region": {
+    "x": 0,
+    "y": 0,
+    "width": 300,
+    "height": 800
+  },
+  "button_region": {
+    "x": 0,
+    "y": 800,
+    "width": 800,
+    "height": 200
+  },
+  "attachment_subnodes": [
+    "raptor-body",
+    "raptor-back-arm", 
+    "raptor-front-leg",
+    "raptor-hindleg-back",
+    "raptor-horn",
+    "raptor-jaw",
+    "raptor-jaw2",
+    "raptor-jaw-tooth",
+    "raptor-mouth-inside",
+    "raptor-saddle-w-shadow",
+    "raptor-tail-shadow",
+    "raptor-tongue",
+    "stirrup-strap"
+  ]
+}
