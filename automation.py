@@ -323,14 +323,16 @@ class AutomationRunner:
         try:
             node_height = self.config_manager.get("node_height", 20)
             success_count = 0
+            consecutive_failures = 0  # 连续失败计数器
+            i = 0  # 循环计数器
             
-            # 循环点击3次
-            for i in range(3):
+            # 循环直到连续2次网格检查失败
+            while consecutive_failures < 2:
                 # 计算当前子节点的y坐标
                 current_y = attachment_pos[1] + (i + 1) * node_height * self.click_manager.dpr
                 click_pos = (attachment_pos[0], current_y)
                 
-                self.logger.info(f"点击子节点 {i+1}/3，坐标: ({click_pos[0]}, {click_pos[1]})")
+                self.logger.info(f"点击子节点 {i+1}，坐标: ({click_pos[0]}, {click_pos[1]})")
                 
                 try:
                     # 点击子节点
@@ -341,9 +343,11 @@ class AutomationRunner:
                     # 在每次点击子节点后，执行4个依次的点击流程
                     self.logger.info(f"开始执行子节点 {i+1} 的网格操作流程")
                     
-                    # 1. 点击勾选网格
-                    if self.click_grid_check(window_region):
+                    # 1. 点击勾选网格 - 根据此结果判断是否继续循环
+                    grid_check_result = self.click_grid_check(window_region)
+                    if grid_check_result:
                         self.logger.info(f"子节点 {i+1}: 勾选网格成功")
+                        consecutive_failures = 0  # 重置连续失败计数器
                         
                         # 2. 点击编辑网格
                         if self.click_grid_edit(window_region):
@@ -364,12 +368,18 @@ class AutomationRunner:
                         else:
                             self.logger.warning(f"子节点 {i+1}: 编辑网格失败，流程中断")
                     else:
-                        self.logger.warning(f"子节点 {i+1}: 勾选网格失败，流程中断")
+                        self.logger.warning(f"子节点 {i+1}: 勾选网格失败")
+                        consecutive_failures += 1  # 增加连续失败计数
+                        self.logger.info(f"连续失败次数: {consecutive_failures}/2")
                     
                 except Exception as e:
                     self.logger.warning(f"点击子节点 {i+1} 失败: {e}")
+                    consecutive_failures += 1  # 异常也算作失败
+                    self.logger.info(f"连续失败次数: {consecutive_failures}/2")
+                
+                i += 1  # 增加循环计数器
             
-            self.logger.info(f"子节点点击完成，成功 {success_count}/3 次")
+            self.logger.info(f"子节点点击完成，总共尝试 {i} 次，成功 {success_count} 次，因连续2次网格检查失败而终止")
             return success_count > 0
             
         except Exception as e:
