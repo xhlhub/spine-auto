@@ -54,6 +54,14 @@ class SpineAutomation:
         # 加载配置
         self.load_config()
         
+        # 检测和设置DPR
+        if "manual_dpr" in self.config and self.config["manual_dpr"]:
+            self.dpr = self.config["manual_dpr"]
+            self.logger.info(f"使用手动设置的DPR: {self.dpr}")
+        else:
+            self.dpr = self.detect_display_scaling()
+            self.logger.info(f"自动检测到显示器缩放比例: {self.dpr}")
+        
         # 初始化点击目标
         self.click_targets: List[ClickTarget] = []
         self.grid_button: Optional[ClickTarget] = None
@@ -137,6 +145,158 @@ class SpineAutomation:
             self.logger.info("配置文件已保存")
         except Exception as e:
             self.logger.error(f"保存配置文件失败: {e}")
+    
+    def detect_display_scaling(self) -> float:
+        """
+        检测Mac显示器的缩放比例（DPR）
+        
+        Returns:
+            显示器缩放比例
+        """
+        try:
+            import subprocess
+            import platform
+            
+            # 检查是否为macOS
+            if platform.system() != "Darwin":
+                self.logger.info("非macOS系统，使用默认缩放比例1.0")
+                return 1.0
+            
+            # 方法1: 使用system_profiler获取显示器信息
+            try:
+                result = subprocess.run([
+                    'system_profiler', 'SPDisplaysDataType', '-json'
+                ], capture_output=True, text=True, timeout=10)
+                
+                if result.returncode == 0:
+                    import json
+                    display_data = json.loads(result.stdout)
+                    
+                    # 查找主显示器的分辨率信息
+                    displays = display_data.get('SPDisplaysDataType', [])
+                    for display_group in displays:
+                        displays_list = display_group.get('spdisplays_ndrvs', [])
+                        for display in displays_list:
+                            # 检查是否为主显示器
+                            if display.get('spdisplays_main', 'spdisplays_no') == 'spdisplays_yes':
+                                resolution = display.get('spdisplays_resolution', '')
+                                if 'Retina' in resolution or '@ 2x' in resolution:
+                                    self.logger.info("检测到Retina显示器，设置DPR为2.0")
+                                    return 2.0
+                                elif '@ 3x' in resolution:
+                                    self.logger.info("检测到3x显示器，设置DPR为3.0")
+                                    return 3.0
+                                
+            except (subprocess.TimeoutExpired, json.JSONDecodeError, KeyError):
+                pass
+            
+            # 方法2: 使用AppleScript获取屏幕信息
+            try:
+                script = '''
+                tell application "System Events"
+                    set screenSize to size of first desktop
+                    set screenBounds to bounds of first desktop
+                    return {item 1 of screenSize, item 2 of screenSize, item 3 of screenBounds, item 4 of screenBounds}
+                end tell
+                '''
+                
+                result = subprocess.run(['osascript', '-e', script], 
+                                      capture_output=True, text=True, timeout=5)
+                
+                if result.returncode == 0:
+                    # 解析返回的尺寸信息
+                    output = result.stdout.strip()
+                    # AppleScript返回格式类似: "1440, 900, 2880, 1800"
+                    values = [float(x.strip()) for x in output.split(',')]
+                    if len(values) >= 4:
+                        logical_width, logical_height = values[0], values[1]
+                        physical_width, physical_height = values[2], values[3]
+                        
+                        # 计算缩放比例
+                        width_ratio = physical_width / logical_width if logical_width > 0 else 1.0
+                        height_ratio = physical_height / logical_height if logical_height > 0 else 1.0
+                        
+                        # 取平均值并四舍五入到最近的整数或0.5
+                        avg_ratio = (width_ratio + height_ratio) / 2
+                        
+                        if avg_ratio >= 2.75:
+                            dpr = 3.0
+                        elif avg_ratio >= 1.75:
+                            dpr = 2.0
+                        elif avg_ratio >= 1.25:
+                            dpr = 1.5
+                        else:
+                            dpr = 1.0
+                        
+                        self.logger.info(f"通过AppleScript检测到DPR: {dpr} (逻辑尺寸: {logical_width}x{logical_height}, 物理尺寸: {physical_width}x{physical_height})")
+                        return dpr
+                        
+            except (subprocess.TimeoutExpired, ValueError, IndexError):
+                pass
+            
+            # 方法3: 使用pyautogui检测屏幕尺寸差异
+            try:
+                import tkinter as tk
+                
+                # 创建临时窗口获取DPI信息
+                root = tk.Tk()
+                root.withdraw()  # 隐藏窗口
+                
+                # 获取屏幕的DPI
+                dpi = root.winfo_fpixels('1i')  # 每英寸像素数
+                root.destroy()
+                
+                # 标准DPI是72，Retina通常是144或更高
+                if dpi >= 216:  # 3x
+                    dpr = 3.0
+                elif dpi >= 144:  # 2x
+                    dpr = 2.0
+                elif dpi >= 108:  # 1.5x
+                    dpr = 1.5
+                else:
+                    dpr = 1.0
+                
+                self.logger.info(f"通过DPI检测到DPR: {dpr} (DPI: {dpi})")
+                return dpr
+                
+            except Exception:
+                pass
+            
+            # 方法4: 通过pyautogui屏幕尺寸推测
+            try:
+                screen_width, screen_height = pyautogui.size()
+                
+                # 常见的Retina分辨率模式
+                retina_resolutions = [
+                    (2880, 1800),  # MacBook Pro 15" Retina
+                    (2560, 1600),  # MacBook Pro 13" Retina
+                    (2304, 1440),  # MacBook 12" Retina
+                    (5120, 2880),  # iMac 27" 5K Retina
+                    (4096, 2304),  # iMac 21.5" 4K Retina
+                ]
+                
+                # 检查是否匹配已知的Retina分辨率
+                for retina_w, retina_h in retina_resolutions:
+                    if (abs(screen_width - retina_w) <= 100 and abs(screen_height - retina_h) <= 100) or \
+                       (abs(screen_width - retina_w//2) <= 50 and abs(screen_height - retina_h//2) <= 50):
+                        self.logger.info(f"根据屏幕分辨率 {screen_width}x{screen_height} 推测为Retina显示器")
+                        return 2.0
+                
+                # 如果屏幕宽度大于2000，很可能是高DPI显示器
+                if screen_width >= 2000:
+                    self.logger.info(f"高分辨率屏幕 {screen_width}x{screen_height}，推测DPR为2.0")
+                    return 2.0
+                    
+            except Exception:
+                pass
+            
+            # 默认返回1.0
+            self.logger.info("无法检测显示器缩放比例，使用默认值1.0")
+            return 1.0
+            
+        except Exception as e:
+            self.logger.error(f"检测显示器缩放比例失败: {e}")
+            return 1.0
     
     def find_spine_window(self) -> Optional[Tuple[int, int, int, int]]:
         """
@@ -709,37 +869,45 @@ class SpineAutomation:
     
     def click_at_position(self, x: int, y: int, window_region: Optional[Tuple[int, int, int, int]] = None):
         """
-        在指定位置点击
+        在指定位置点击，自动处理DPR缩放
         
         Args:
-            x: 相对于截图区域的x坐标
-            y: 相对于截图区域的y坐标
+            x: 相对于截图区域的x坐标（模板匹配返回的坐标）
+            y: 相对于截图区域的y坐标（模板匹配返回的坐标）
             window_region: 窗口区域，用于坐标转换
         """
 
         try:
+            # 应用DPR修正 - 模板匹配在高分辨率图像上找到的坐标需要除以DPR
+            corrected_x = x / self.dpr
+            corrected_y = y / self.dpr
+            
+            self.logger.debug(f"DPR修正: 原始坐标({x}, {y}) -> 修正坐标({corrected_x:.1f}, {corrected_y:.1f}), DPR={self.dpr}")
 
             # 如果有窗口区域信息，需要转换坐标
             if window_region:
-                click_x = window_region[0] + x
-                click_y = window_region[1] + y
+                # 窗口区域坐标也需要DPR修正
+                window_x = window_region[0] / self.dpr
+                window_y = window_region[1] / self.dpr
+                click_x = window_x + corrected_x
+                click_y = window_y + corrected_y
             else:
+                click_x = corrected_x
+                click_y = corrected_y
 
-                click_x = x
-                click_y = y
-
-            # click_x = 1341
-            # click_y = 88
+            # 转换为整数坐标
+            click_x = int(round(click_x))
+            click_y = int(round(click_y))
             
-            self.logger.info(f"准备点击位置: ({click_x}, {click_y})")
+            self.logger.info(f"准备点击位置: ({click_x}, {click_y}) [DPR修正后]")
             
             # 确保Spine窗口处于活动状态
             if not self.activate_spine_window():
                 self.logger.warning("窗口激活可能失败，但继续尝试点击")
             
             # 使用pyautogui点击
-                # 先移动鼠标到目标位置
-            pyautogui.moveTo(click_x , click_y, duration=0.2)
+            # 先移动鼠标到目标位置
+            pyautogui.moveTo(click_x, click_y, duration=0.2)
             time.sleep(0.1)
             
             # 执行点击
@@ -1206,9 +1374,10 @@ def main():
         print("5. 检查系统权限")
         print("6. 分析模板质量")
         print("7. 优化匹配设置")
-        print("8. 退出")
+        print("8. 测试DPR检测")
+        print("9. 退出")
         
-        choice = input("请输入选择 (1-8): ").strip()
+        choice = input("请输入选择 (1-9): ").strip()
         
         if choice == "1":
             automation.setup_templates()
@@ -1257,6 +1426,44 @@ def main():
             print("✅ 匹配设置优化完成")
             input("按回车继续...")
         elif choice == "8":
+            # 测试DPR检测
+            print("\n=== DPR检测测试 ===")
+            print(f"当前检测到的DPR: {automation.dpr}")
+            
+            # 获取屏幕信息
+            try:
+                screen_width, screen_height = pyautogui.size()
+                print(f"PyAutoGUI报告的屏幕尺寸: {screen_width}x{screen_height}")
+                
+                # 测试坐标转换
+                test_coords = [(100, 100), (500, 300), (1000, 600)]
+                print("\n坐标转换测试:")
+                for orig_x, orig_y in test_coords:
+                    corrected_x = orig_x / automation.dpr
+                    corrected_y = orig_y / automation.dpr
+                    print(f"  原始: ({orig_x}, {orig_y}) -> DPR修正: ({corrected_x:.1f}, {corrected_y:.1f})")
+                
+                # 提供手动设置DPR的选项
+                print(f"\n当前DPR设置: {automation.dpr}")
+                manual_dpr = input("如需手动设置DPR，请输入数值（直接回车保持当前值）: ").strip()
+                if manual_dpr:
+                    try:
+                        new_dpr = float(manual_dpr)
+                        if 0.5 <= new_dpr <= 4.0:
+                            automation.dpr = new_dpr
+                            automation.config["manual_dpr"] = new_dpr
+                            automation.save_config()
+                            print(f"✅ DPR已手动设置为: {new_dpr}")
+                        else:
+                            print("❌ DPR值应在0.5-4.0之间")
+                    except ValueError:
+                        print("❌ 请输入有效的数值")
+                        
+            except Exception as e:
+                print(f"❌ 测试失败: {e}")
+            
+            input("\n按回车继续...")
+        elif choice == "9":
             print("退出程序")
             break
         else:
