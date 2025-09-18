@@ -162,8 +162,40 @@ class SpineAutomation:
                 self.logger.info("非macOS系统，使用默认缩放比例1.0")
                 return 1.0
             
-            # 方法1: 使用system_profiler获取显示器信息
+            self.logger.info("开始检测显示器DPR...")
+            
+            # 方法1: 使用Cocoa框架直接获取backingScaleFactor (最准确的方法)
             try:
+                self.logger.debug("尝试方法1: Cocoa NSScreen.backingScaleFactor")
+                cocoa_script = '''
+import Cocoa
+try:
+    screen = Cocoa.NSScreen.mainScreen()
+    if screen:
+        scale_factor = screen.backingScaleFactor()
+        print(f"SCALE_FACTOR:{scale_factor}")
+    else:
+        print("SCALE_FACTOR:1.0")
+except Exception as e:
+    print(f"ERROR:{e}")
+'''
+                
+                result = subprocess.run(['python3', '-c', cocoa_script], 
+                                      capture_output=True, text=True, timeout=5)
+                
+                if result.returncode == 0:
+                    for line in result.stdout.strip().split('\n'):
+                        if line.startswith('SCALE_FACTOR:'):
+                            scale_factor = float(line.split(':')[1])
+                            self.logger.info(f"方法1: 通过Cocoa NSScreen检测到DPR: {scale_factor}")
+                            return scale_factor
+                            
+            except Exception as e:
+                self.logger.debug(f"方法1失败: {e}")
+            
+            # 方法2: 使用system_profiler获取显示器信息
+            try:
+                self.logger.debug("尝试方法2: system_profiler")
                 result = subprocess.run([
                     'system_profiler', 'SPDisplaysDataType', '-json'
                 ], capture_output=True, text=True, timeout=10)
@@ -180,18 +212,69 @@ class SpineAutomation:
                             # 检查是否为主显示器
                             if display.get('spdisplays_main', 'spdisplays_no') == 'spdisplays_yes':
                                 resolution = display.get('spdisplays_resolution', '')
+                                self.logger.debug(f"主显示器分辨率字符串: {resolution}")
+                                
                                 if 'Retina' in resolution or '@ 2x' in resolution:
-                                    self.logger.info("检测到Retina显示器，设置DPR为2.0")
+                                    self.logger.info("方法2: 检测到Retina显示器，设置DPR为2.0")
                                     return 2.0
                                 elif '@ 3x' in resolution:
-                                    self.logger.info("检测到3x显示器，设置DPR为3.0")
+                                    self.logger.info("方法2: 检测到3x显示器，设置DPR为3.0")
                                     return 3.0
                                 
-            except (subprocess.TimeoutExpired, json.JSONDecodeError, KeyError):
-                pass
+            except (subprocess.TimeoutExpired, json.JSONDecodeError, KeyError) as e:
+                self.logger.debug(f"方法2失败: {e}")
             
-            # 方法2: 使用AppleScript获取屏幕信息
+            # 方法3: 使用pyautogui和tkinter比较屏幕尺寸
             try:
+                self.logger.debug("尝试方法3: pyautogui + tkinter尺寸比较")
+                import tkinter as tk
+                
+                # 获取pyautogui的屏幕尺寸 (通常是物理像素)
+                screen_width, screen_height = pyautogui.size()
+                self.logger.debug(f"pyautogui屏幕尺寸: {screen_width}x{screen_height}")
+                
+                # 创建临时窗口获取逻辑尺寸
+                root = tk.Tk()
+                root.withdraw()  # 隐藏窗口
+                
+                # 获取tkinter的屏幕尺寸 (逻辑像素)
+                tk_width = root.winfo_screenwidth()
+                tk_height = root.winfo_screenheight()
+                
+                # 获取DPI信息
+                dpi = root.winfo_fpixels('1i')  # 每英寸像素数
+                
+                root.destroy()
+                
+                self.logger.debug(f"tkinter屏幕尺寸: {tk_width}x{tk_height}")
+                self.logger.debug(f"DPI: {dpi}")
+                
+                # 比较pyautogui和tkinter的屏幕尺寸差异来确定缩放比例
+                if tk_width > 0 and tk_height > 0:
+                    width_ratio = screen_width / tk_width
+                    height_ratio = screen_height / tk_height
+                    avg_ratio = (width_ratio + height_ratio) / 2
+                    
+                    self.logger.debug(f"尺寸比例 - 宽度: {width_ratio:.2f}, 高度: {height_ratio:.2f}, 平均: {avg_ratio:.2f}")
+                    
+                    if avg_ratio >= 2.75:
+                        dpr = 3.0
+                    elif avg_ratio >= 1.75:
+                        dpr = 2.0
+                    elif avg_ratio >= 1.25:
+                        dpr = 1.5
+                    else:
+                        dpr = 1.0
+                    
+                    self.logger.info(f"方法3: 通过尺寸比较检测到DPR: {dpr}")
+                    return dpr
+                
+            except Exception as e:
+                self.logger.debug(f"方法3失败: {e}")
+            
+            # 方法4: 使用AppleScript获取屏幕信息
+            try:
+                self.logger.debug("尝试方法4: AppleScript")
                 script = '''
                 tell application "System Events"
                     set screenSize to size of first desktop
@@ -206,18 +289,24 @@ class SpineAutomation:
                 if result.returncode == 0:
                     # 解析返回的尺寸信息
                     output = result.stdout.strip()
-                    # AppleScript返回格式类似: "1440, 900, 2880, 1800"
+                    self.logger.debug(f"AppleScript输出: {output}")
                     values = [float(x.strip()) for x in output.split(',')]
                     if len(values) >= 4:
                         logical_width, logical_height = values[0], values[1]
                         physical_width, physical_height = values[2], values[3]
                         
+                        self.logger.debug(f"逻辑尺寸: {logical_width}x{logical_height}")
+                        self.logger.debug(f"物理尺寸: {physical_width}x{physical_height}")
+                        
                         # 计算缩放比例
                         width_ratio = physical_width / logical_width if logical_width > 0 else 1.0
                         height_ratio = physical_height / logical_height if logical_height > 0 else 1.0
                         
+                        self.logger.debug(f"宽度比例: {width_ratio:.2f}, 高度比例: {height_ratio:.2f}")
+                        
                         # 取平均值并四舍五入到最近的整数或0.5
                         avg_ratio = (width_ratio + height_ratio) / 2
+                        self.logger.debug(f"平均比例: {avg_ratio:.2f}")
                         
                         if avg_ratio >= 2.75:
                             dpr = 3.0
@@ -228,70 +317,60 @@ class SpineAutomation:
                         else:
                             dpr = 1.0
                         
-                        self.logger.info(f"通过AppleScript检测到DPR: {dpr} (逻辑尺寸: {logical_width}x{logical_height}, 物理尺寸: {physical_width}x{physical_height})")
+                        self.logger.info(f"方法4: 通过AppleScript检测到DPR: {dpr}")
                         return dpr
                         
-            except (subprocess.TimeoutExpired, ValueError, IndexError):
-                pass
+            except (subprocess.TimeoutExpired, ValueError, IndexError) as e:
+                self.logger.debug(f"方法4失败: {e}")
             
-            # 方法3: 使用pyautogui检测屏幕尺寸差异
+            # 方法5: 通过已知分辨率推测
             try:
-                import tkinter as tk
-                
-                # 创建临时窗口获取DPI信息
-                root = tk.Tk()
-                root.withdraw()  # 隐藏窗口
-                
-                # 获取屏幕的DPI
-                dpi = root.winfo_fpixels('1i')  # 每英寸像素数
-                root.destroy()
-                
-                # 标准DPI是72，Retina通常是144或更高
-                if dpi >= 216:  # 3x
-                    dpr = 3.0
-                elif dpi >= 144:  # 2x
-                    dpr = 2.0
-                elif dpi >= 108:  # 1.5x
-                    dpr = 1.5
-                else:
-                    dpr = 1.0
-                
-                self.logger.info(f"通过DPI检测到DPR: {dpr} (DPI: {dpi})")
-                return dpr
-                
-            except Exception:
-                pass
-            
-            # 方法4: 通过pyautogui屏幕尺寸推测
-            try:
+                self.logger.debug("尝试方法5: 已知分辨率推测")
                 screen_width, screen_height = pyautogui.size()
                 
-                # 常见的Retina分辨率模式
-                retina_resolutions = [
-                    (2880, 1800),  # MacBook Pro 15" Retina
-                    (2560, 1600),  # MacBook Pro 13" Retina
-                    (2304, 1440),  # MacBook 12" Retina
-                    (5120, 2880),  # iMac 27" 5K Retina
-                    (4096, 2304),  # iMac 21.5" 4K Retina
+                # 常见的Retina分辨率模式 (逻辑分辨率)
+                retina_logical_resolutions = [
+                    (1440, 900),   # MacBook Pro 15" Retina (逻辑)
+                    (1280, 800),   # MacBook Pro 13" Retina (逻辑)
+                    (1152, 720),   # MacBook 12" Retina (逻辑)
+                    (2560, 1440),  # iMac 27" 5K Retina (逻辑)
+                    (2048, 1152),  # iMac 21.5" 4K Retina (逻辑)
                 ]
                 
-                # 检查是否匹配已知的Retina分辨率
-                for retina_w, retina_h in retina_resolutions:
-                    if (abs(screen_width - retina_w) <= 100 and abs(screen_height - retina_h) <= 100) or \
-                       (abs(screen_width - retina_w//2) <= 50 and abs(screen_height - retina_h//2) <= 50):
-                        self.logger.info(f"根据屏幕分辨率 {screen_width}x{screen_height} 推测为Retina显示器")
+                # 常见的Retina分辨率模式 (物理分辨率)
+                retina_physical_resolutions = [
+                    (2880, 1800),  # MacBook Pro 15" Retina (物理)
+                    (2560, 1600),  # MacBook Pro 13" Retina (物理)
+                    (2304, 1440),  # MacBook 12" Retina (物理)
+                    (5120, 2880),  # iMac 27" 5K Retina (物理)
+                    (4096, 2304),  # iMac 21.5" 4K Retina (物理)
+                ]
+                
+                self.logger.debug(f"当前屏幕分辨率: {screen_width}x{screen_height}")
+                
+                # 检查是否匹配已知的Retina逻辑分辨率
+                for retina_w, retina_h in retina_logical_resolutions:
+                    if abs(screen_width - retina_w) <= 50 and abs(screen_height - retina_h) <= 50:
+                        self.logger.info(f"方法5: 根据逻辑分辨率 {screen_width}x{screen_height} 推测为Retina显示器 (DPR=2.0)")
+                        return 2.0
+                
+                # 检查是否匹配已知的Retina物理分辨率
+                for retina_w, retina_h in retina_physical_resolutions:
+                    if abs(screen_width - retina_w) <= 100 and abs(screen_height - retina_h) <= 100:
+                        self.logger.info(f"方法5: 根据物理分辨率 {screen_width}x{screen_height} 推测为Retina显示器 (DPR=2.0)")
                         return 2.0
                 
                 # 如果屏幕宽度大于2000，很可能是高DPI显示器
                 if screen_width >= 2000:
-                    self.logger.info(f"高分辨率屏幕 {screen_width}x{screen_height}，推测DPR为2.0")
+                    self.logger.info(f"方法5: 高分辨率屏幕 {screen_width}x{screen_height}，推测DPR为2.0")
                     return 2.0
                     
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.debug(f"方法5失败: {e}")
             
             # 默认返回1.0
-            self.logger.info("无法检测显示器缩放比例，使用默认值1.0")
+            self.logger.warning("所有DPR检测方法都失败，使用默认值1.0")
+            self.logger.warning("如果你的显示器是Retina屏幕，请在config.json中手动设置 'manual_dpr': 2.0")
             return 1.0
             
         except Exception as e:
@@ -397,7 +476,7 @@ class SpineAutomation:
             self.logger.error(f"检测应用程序名称失败: {e}")
             return None
     
-    def take_screenshot(self, region: Optional[Tuple[int, int, int, int]] = None) -> np.ndarray:
+    def take_screenshot(self, region: Optional[Tuple[int, int, int, int]] = None, name: Optional[str] = None) -> np.ndarray:
         """
         截取屏幕或指定区域
         
@@ -419,7 +498,7 @@ class SpineAutomation:
             # 新增：将截图保存为本地图片，文件名带时间戳
             import datetime
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            save_path = f"screenshot_{timestamp}.png"
+            save_path = f"screenshot_{name}_{timestamp}.png"
             cv2.imwrite(save_path, screenshot_cv)
             self.logger.info(f"截图已保存到本地: {save_path}")
 
@@ -1154,7 +1233,7 @@ class SpineAutomation:
         try:
             # 等待下拉菜单出现
             time.sleep(0.5)
-            screenshot = self.take_screenshot(window_region)
+            screenshot = self.take_screenshot(window_region, "grid_menu_option")
             if screenshot is None:
                 return False
             
