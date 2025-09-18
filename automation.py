@@ -178,9 +178,92 @@ class AutomationRunner:
             self.logger.error(f"点击网格菜单选项失败: {e}")
             return False
     
+    def detect_attachment_node_state_with_confidence(self, screenshot) -> Tuple[Optional[str], Optional[Tuple[int, int]], float]:
+        """
+        通过比较置信度检测附件节点状态
+        
+        Args:
+            screenshot: 屏幕截图
+            
+        Returns:
+            (状态, 位置, 最高置信度) - 状态可能是 'open', 'close', 或 None
+        """
+        import cv2
+        import numpy as np
+        
+        confidence_threshold = self.config_manager.get("confidence_threshold", 0.8)
+        
+        # 准备模板路径
+        open_template_path = str(self.template_manager.templates_dir / "attachment_node_open.png")
+        close_template_path = str(self.template_manager.templates_dir / "attachment_node.png")
+        
+        open_confidence = 0.0
+        close_confidence = 0.0
+        open_pos = None
+        close_pos = None
+        
+        # 检测打开状态的置信度
+        try:
+            if self.template_manager.templates_dir.joinpath("attachment_node_open.png").exists():
+                open_template = cv2.imread(open_template_path)
+                if open_template is not None:
+                    result = cv2.matchTemplate(screenshot, open_template, cv2.TM_CCOEFF_NORMED)
+                    _, max_val, _, max_loc = cv2.minMaxLoc(result)
+                    open_confidence = max_val
+                    if max_val >= confidence_threshold:
+                        template_h, template_w = open_template.shape[:2]
+                        open_pos = (max_loc[0] + template_w // 2, max_loc[1] + template_h // 2)
+                        
+        except Exception as e:
+            self.logger.warning(f"检测打开状态失败: {e}")
+        
+        # 检测关闭状态的置信度
+        try:
+            if self.template_manager.templates_dir.joinpath("attachment_node.png").exists():
+                close_template = cv2.imread(close_template_path)
+                if close_template is not None:
+                    result = cv2.matchTemplate(screenshot, close_template, cv2.TM_CCOEFF_NORMED)
+                    _, max_val, _, max_loc = cv2.minMaxLoc(result)
+                    close_confidence = max_val
+                    if max_val >= confidence_threshold:
+                        template_h, template_w = close_template.shape[:2]
+                        close_pos = (max_loc[0] + template_w // 2, max_loc[1] + template_h // 2)
+                        
+        except Exception as e:
+            self.logger.warning(f"检测关闭状态失败: {e}")
+        
+        # 记录置信度信息
+        self.logger.info(f"附件节点状态检测 - 打开状态置信度: {open_confidence:.3f}, 关闭状态置信度: {close_confidence:.3f}")
+        
+        # 比较置信度，选择更高的那个
+        confidence_diff_threshold = self.config_manager.get("confidence_diff_threshold", 0.05)  # 置信度差异阈值
+        
+        if open_confidence > close_confidence + confidence_diff_threshold:
+            # 打开状态的置信度明显更高
+            if open_pos is not None:
+                self.logger.info(f"节点状态判定为：打开 (置信度差异: {open_confidence - close_confidence:.3f})")
+                return ('open', open_pos, open_confidence)
+        elif close_confidence > open_confidence + confidence_diff_threshold:
+            # 关闭状态的置信度明显更高
+            if close_pos is not None:
+                self.logger.info(f"节点状态判定为：关闭 (置信度差异: {close_confidence - open_confidence:.3f})")
+                return ('close', close_pos, close_confidence)
+        else:
+            # 置信度差异不大，使用更保守的策略
+            if max(open_confidence, close_confidence) >= confidence_threshold:
+                if open_confidence >= close_confidence and open_pos is not None:
+                    self.logger.info(f"节点状态判定为：打开 (置信度相近，选择打开: {open_confidence:.3f})")
+                    return ('open', open_pos, open_confidence)
+                elif close_pos is not None:
+                    self.logger.info(f"节点状态判定为：关闭 (置信度相近，选择关闭: {close_confidence:.3f})")
+                    return ('close', close_pos, close_confidence)
+        
+        self.logger.warning("无法确定附件节点状态")
+        return (None, None, max(open_confidence, close_confidence))
+
     def click_attachment_node(self, window_region: Optional[Tuple[int, int, int, int]] = None) -> Optional[Tuple[int, int]]:
-        """点击附件节点并返回节点位置"""
-        self.logger.info("步骤3: 点击附件节点")
+        """点击附件节点并返回节点位置（只在节点为关闭状态时点击）"""
+        self.logger.info("步骤3: 智能检查并点击附件节点")
         
         try:
             # 等待界面更新
@@ -189,30 +272,27 @@ class AutomationRunner:
             if screenshot is None:
                 return None
             
-            attachment_template = str(self.template_manager.templates_dir / "attachment_node.png")
-            attachment_pos = self.template_manager.find_template(
-                screenshot, 
-                attachment_template, 
-                self.config_manager.get("confidence_threshold", 0.8)
-            )
+            # 使用置信度比较检测节点状态
+            state, position, confidence = self.detect_attachment_node_state_with_confidence(screenshot)
             
-            if attachment_pos is None:
-                self.logger.warning("未找到附件节点")
+            if state is None:
+                self.logger.warning("未找到附件节点或无法确定状态")
                 return None
-            
-            self.click_manager.click_at_position(
-                attachment_pos[0], attachment_pos[1], 
-                window_region
-            )
-            
-            if self.config_manager.get("debug_mode", False):
-                self.logger.info("附件节点点击完成，等待子节点展开...")
+            elif state == 'open':
+                self.logger.info(f"附件节点已经是打开状态，无需点击，位置: {position}，置信度: {confidence:.3f}")
+                return position
+            else:  # state == 'close'
+                self.logger.info(f"附件节点是关闭状态，点击打开，位置: {position}，置信度: {confidence:.3f}")
+                self.click_manager.click_at_position(position[0], position[1], window_region)
                 
-            time.sleep(self.config_manager.get("operation_delay", 2.0))  # 等待子节点展开
-            return attachment_pos
+                if self.config_manager.get("debug_mode", False):
+                    self.logger.info("附件节点点击完成，等待子节点展开...")
+                    
+                time.sleep(self.config_manager.get("operation_delay", 2.0))  # 等待子节点展开
+                return position
             
         except Exception as e:
-            self.logger.error(f"点击附件节点失败: {e}")
+            self.logger.error(f"智能检查并点击附件节点失败: {e}")
             return None
     
     def process_attachment_subnodes(self, attachment_pos: Tuple[int, int], window_region: Optional[Tuple[int, int, int, int]] = None):

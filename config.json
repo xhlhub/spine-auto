@@ -10,6 +10,7 @@
   "enable_preprocessing": true,
   "scale_range": [0.8, 1.2],
   "adaptive_confidence": true,
+  "confidence_diff_threshold": 0.05,
   "tree_region": {
     "x": 0,
     "y": 0,
