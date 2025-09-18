@@ -88,6 +88,7 @@ class SpineAutomation:
         """创建默认配置文件"""
         self.config = {
             "window_title": "Spine",  # Spine窗口标题关键词
+            "app_name": None,  # 应用程序名称，None时自动检测
             "click_delay": 5.0,  # 点击间隔(秒)
             "operation_delay": 2.0,  # 操作完成等待时间(秒)
             "confidence_threshold": 0.8,  # 图像匹配置信度
@@ -150,6 +151,15 @@ class SpineAutomation:
             
             if spine_windows:
                 self.logger.info(f"找到Spine窗口: {spine_windows[0]}")
+                
+                # 自动检测应用程序名称
+                if self.config.get("app_name") is None:
+                    detected_app_name = self.detect_app_name_from_title(spine_windows[0])
+                    if detected_app_name:
+                        self.config["app_name"] = detected_app_name
+                        self.save_config()  # 保存检测到的应用程序名称
+                        self.logger.info(f"自动检测到应用程序名称: {detected_app_name}")
+                
                 # 注意：在macOS上，pygetwindow的功能有限
                 # 我们暂时返回None，让脚本使用全屏模式
                 # 这是因为macOS版本的pygetwindow无法获取窗口几何信息
@@ -163,6 +173,64 @@ class SpineAutomation:
             return None
         except Exception as e:
             self.logger.error(f"查找窗口失败: {e}")
+            return None
+    
+    def detect_app_name_from_title(self, window_title: str) -> Optional[str]:
+        """
+        从窗口标题检测应用程序名称
+        
+        Args:
+            window_title: 窗口标题
+            
+        Returns:
+            应用程序名称或None
+        """
+        try:
+            import subprocess
+            
+            # 尝试常见的应用程序名称模式
+            possible_names = []
+            
+            # 从窗口标题中提取可能的应用程序名称
+            title_parts = window_title.split()
+            for part in title_parts:
+                if "Spine" in part and part != "Spine":
+                    possible_names.append(part)
+            
+            # 添加常见的Spine应用程序名称
+            possible_names.extend([
+                "Spine Trial",
+                "Spine",
+                "Spine Esoteric Software", 
+                "Spine Pro"
+            ])
+            
+            # 测试每个可能的名称
+            for app_name in possible_names:
+                try:
+                    # 测试应用程序是否存在
+                    test_script = f'''
+                    tell application "{app_name}"
+                        return name
+                    end tell
+                    '''
+                    result = subprocess.run(['osascript', '-e', test_script], 
+                                          capture_output=True, text=True, timeout=2)
+                    
+                    if result.returncode == 0:
+                        self.logger.info(f"检测到有效的应用程序名称: {app_name}")
+                        return app_name
+                        
+                except subprocess.TimeoutExpired:
+                    continue
+                except Exception:
+                    continue
+            
+            self.logger.warning("无法自动检测应用程序名称")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"检测应用程序名称失败: {e}")
             return None
     
     def take_screenshot(self, region: Optional[Tuple[int, int, int, int]] = None) -> np.ndarray:
@@ -318,27 +386,36 @@ class SpineAutomation:
         try:
             import subprocess
             
+            # 获取应用程序名称
+            app_name = self.config.get("app_name", "Spine")
+            
             # 使用AppleScript进行点击
             click_script = f'''
-            tell application "System Events"
-                -- 确保Spine处于前台
-                tell application "Spine" to activate
-                delay 0.3
-                
-                -- 执行点击
-                click at {{{x}, {y}}}
-                delay 0.1
-            end tell
+            try
+                tell application "System Events"
+                    -- 确保Spine处于前台
+                    tell application "{app_name}" to activate
+                    delay 0.3
+                    
+                    -- 执行点击
+                    click at {{{x}, {y}}}
+                    delay 0.1
+                end tell
+                return "success"
+            on error errMsg
+                return "error: " & errMsg
+            end try
             '''
             
             result = subprocess.run(['osascript', '-e', click_script], 
                                    capture_output=True, text=True, timeout=3)
             
-            if result.returncode == 0:
+            if result.returncode == 0 and "success" in result.stdout:
                 self.logger.info(f"AppleScript点击成功: ({x}, {y})")
                 return True
             else:
-                self.logger.warning(f"AppleScript点击失败: {result.stderr}")
+                error_msg = result.stderr if result.stderr else result.stdout
+                self.logger.warning(f"AppleScript点击失败: {error_msg}")
                 return False
                 
         except subprocess.TimeoutExpired:
@@ -379,45 +456,56 @@ class SpineAutomation:
         try:
             import subprocess
             
-            # 方法1: 强制激活Spine应用
-            self.logger.info("尝试激活Spine窗口...")
+            # 获取应用程序名称
+            app_name = self.config.get("app_name", "Spine")
+            self.logger.info(f"尝试激活{app_name}窗口...")
             
             # 首先尝试使用AppleScript激活
-            activate_script = '''
-            tell application "Spine"
-                activate
-                delay 0.5
-            end tell
-            
-            tell application "System Events"
-                tell process "Spine"
-                    set frontmost to true
-                    delay 0.2
+            activate_script = f'''
+            try
+                tell application "{app_name}"
+                    activate
+                    delay 0.5
                 end tell
-            end tell
+                
+                tell application "System Events"
+                    tell process "{app_name}"
+                        set frontmost to true
+                        delay 0.2
+                    end tell
+                end tell
+                return "success"
+            on error errMsg
+                return "error: " & errMsg
+            end try
             '''
             
             result = subprocess.run(['osascript', '-e', activate_script], 
                                    capture_output=True, text=True, timeout=5)
             
-            if result.returncode == 0:
-                self.logger.info("Spine窗口已激活")
+            if result.returncode == 0 and "success" in result.stdout:
+                self.logger.info(f"{app_name}窗口已激活")
                 time.sleep(0.8)  # 等待窗口完全激活
                 return True
             else:
-                self.logger.warning(f"AppleScript激活失败: {result.stderr}")
+                self.logger.warning(f"AppleScript激活失败: {result.stderr if result.stderr else result.stdout}")
                 
             # 方法2: 使用系统命令激活
-            subprocess.run(['open', '-a', 'Spine'], check=False)
-            time.sleep(1.0)
+            try:
+                subprocess.run(['open', '-a', app_name], check=False, timeout=3)
+                time.sleep(1.0)
+                self.logger.info(f"使用系统命令激活{app_name}")
+                return True
+            except subprocess.TimeoutExpired:
+                self.logger.warning("系统命令激活超时")
             
-            return True
+            return False
             
         except subprocess.TimeoutExpired:
             self.logger.error("激活窗口超时")
             return False
         except Exception as e:
-            self.logger.warning(f"激活Spine窗口失败: {e}")
+            self.logger.warning(f"激活{app_name}窗口失败: {e}")
             return False
     
     def save_template_from_selection(self, name: str, region: Tuple[int, int, int, int]):
@@ -544,7 +632,7 @@ class SpineAutomation:
             self.click_at_position(
                 filter_pos[0], filter_pos[1], 
                 window_region, 
-                force_click=self.config.get("force_click", True)
+                force_click=False
             )
             
             # 调试模式下额外检查

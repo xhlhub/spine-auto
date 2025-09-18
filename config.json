@@ -18,7 +18,7 @@
   },
   "attachment_subnodes": [
     "raptor-body",
-    "raptor-back-arm", 
+    "raptor-back-arm",
     "raptor-front-leg",
     "raptor-hindleg-back",
     "raptor-horn",
@@ -30,5 +30,6 @@
     "raptor-tail-shadow",
     "raptor-tongue",
     "stirrup-strap"
-  ]
+  ],
+  "app_name": "Spine Trial"
 }
