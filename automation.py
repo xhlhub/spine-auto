@@ -333,9 +333,40 @@ class AutomationRunner:
                 self.logger.info(f"点击子节点 {i+1}/3，坐标: ({click_pos[0]}, {click_pos[1]})")
                 
                 try:
+                    # 点击子节点
                     self.click_manager.click_at_position(click_pos[0], click_pos[1], window_region)
                     success_count += 1
                     time.sleep(self.config_manager.get("click_delay", 5.0))
+                    
+                    # 在每次点击子节点后，执行4个依次的点击流程
+                    self.logger.info(f"开始执行子节点 {i+1} 的网格操作流程")
+                    
+                    # 1. 点击勾选网格
+                    if self.click_grid_check(window_region):
+                        self.logger.info(f"子节点 {i+1}: 勾选网格成功")
+                    else:
+                        self.logger.warning(f"子节点 {i+1}: 勾选网格失败")
+                    
+                    # 2. 点击编辑网格
+                    if self.click_grid_edit(window_region):
+                        self.logger.info(f"子节点 {i+1}: 编辑网格成功")
+                    else:
+                        self.logger.warning(f"子节点 {i+1}: 编辑网格失败")
+                    
+                    # 3. 点击描绘
+                    if self.click_grid_draw(window_region):
+                        self.logger.info(f"子节点 {i+1}: 描绘成功")
+                    else:
+                        self.logger.warning(f"子节点 {i+1}: 描绘失败")
+                    
+                    # 4. 点击确定
+                    if self.click_draw_sure(window_region):
+                        self.logger.info(f"子节点 {i+1}: 确定成功")
+                    else:
+                        self.logger.warning(f"子节点 {i+1}: 确定失败")
+                    
+                    self.logger.info(f"子节点 {i+1} 的网格操作流程完成")
+                    
                 except Exception as e:
                     self.logger.warning(f"点击子节点 {i+1} 失败: {e}")
             
@@ -346,7 +377,133 @@ class AutomationRunner:
             self.logger.error(f"点击子节点失败: {e}")
             return False
     
+    def click_grid_check(self, window_region: Optional[Tuple[int, int, int, int]] = None) -> bool:
+        """点击勾选网格"""
+        self.logger.info("执行操作: 点击勾选网格")
+        
+        try:
+            screenshot = self.template_manager.take_screenshot(window_region)
+            if screenshot is None:
+                return False
+            
+            grid_check_template = str(self.template_manager.templates_dir / "grid_check.png")
+            grid_check_pos = self.template_manager.find_template(
+                screenshot, 
+                grid_check_template, 
+                self.config_manager.get("confidence_threshold", 0.8)
+            )
+            
+            if grid_check_pos is None:
+                self.logger.warning("未找到勾选网格按钮")
+                return False
+            
+            self.click_manager.click_at_position(
+                grid_check_pos[0], grid_check_pos[1], 
+                window_region
+            )
+            
+            time.sleep(self.config_manager.get("click_delay", 5.0))
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"点击勾选网格失败: {e}")
+            return False
     
+    def click_grid_edit(self, window_region: Optional[Tuple[int, int, int, int]] = None) -> bool:
+        """点击编辑网格"""
+        self.logger.info("执行操作: 点击编辑网格")
+        
+        try:
+            screenshot = self.template_manager.take_screenshot(window_region)
+            if screenshot is None:
+                return False
+            
+            grid_edit_template = str(self.template_manager.templates_dir / "grid_edit.png")
+            grid_edit_pos = self.template_manager.find_template(
+                screenshot, 
+                grid_edit_template, 
+                self.config_manager.get("confidence_threshold", 0.8)
+            )
+            
+            if grid_edit_pos is None:
+                self.logger.warning("未找到编辑网格按钮")
+                return False
+            
+            self.click_manager.click_at_position(
+                grid_edit_pos[0], grid_edit_pos[1], 
+                window_region
+            )
+            
+            time.sleep(self.config_manager.get("click_delay", 5.0))
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"点击编辑网格失败: {e}")
+            return False
+    
+    def click_grid_draw(self, window_region: Optional[Tuple[int, int, int, int]] = None) -> bool:
+        """点击描绘按钮"""
+        self.logger.info("执行操作: 点击描绘")
+        
+        try:
+            screenshot = self.template_manager.take_screenshot(window_region)
+            if screenshot is None:
+                return False
+            
+            grid_draw_template = str(self.template_manager.templates_dir / "grid_draw.png")
+            grid_draw_pos = self.template_manager.find_template(
+                screenshot, 
+                grid_draw_template, 
+                self.config_manager.get("confidence_threshold", 0.8)
+            )
+            
+            if grid_draw_pos is None:
+                self.logger.warning("未找到描绘按钮")
+                return False
+            
+            self.click_manager.click_at_position(
+                grid_draw_pos[0], grid_draw_pos[1], 
+                window_region
+            )
+            
+            time.sleep(self.config_manager.get("click_delay", 5.0))
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"点击描绘失败: {e}")
+            return False
+    
+    def click_draw_sure(self, window_region: Optional[Tuple[int, int, int, int]] = None) -> bool:
+        """点击确定按钮"""
+        self.logger.info("执行操作: 点击确定")
+        
+        try:
+            screenshot = self.template_manager.take_screenshot(window_region)
+            if screenshot is None:
+                return False
+            
+            draw_sure_template = str(self.template_manager.templates_dir / "draw_sure.png")
+            draw_sure_pos = self.template_manager.find_template(
+                screenshot, 
+                draw_sure_template, 
+                self.config_manager.get("confidence_threshold", 0.8)
+            )
+            
+            if draw_sure_pos is None:
+                self.logger.warning("未找到确定按钮")
+                return False
+            
+            self.click_manager.click_at_position(
+                draw_sure_pos[0], draw_sure_pos[1], 
+                window_region
+            )
+            
+            time.sleep(self.config_manager.get("click_delay", 5.0))
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"点击确定失败: {e}")
+            return False
 
     def setup_templates(self):
         """设置模板图片（需要用户手动截图）"""

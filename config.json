@@ -2,7 +2,7 @@
   "window_title": "Spine Trial Spine",
   "click_delay": 1.0,
   "operation_delay": 0.3,
-  "confidence_threshold": 0.7,
+  "confidence_threshold": 0.93,
   "max_retries": 3,
   "debug_mode": true,
   "matching_algorithm": "enhanced",
