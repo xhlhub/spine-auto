@@ -217,3 +217,4 @@ pip install pyobjc-framework-Quartz
 ---
 
 如有问题或建议，请查看日志文件或联系技术支持。
+# spine-auto
