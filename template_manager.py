@@ -212,7 +212,7 @@ class TemplateManager:
                 return result
         
         # 步骤4: 降低置信度重试
-        if confidence > 0.6:
+        if confidence > 0.6 and self.config_manager.get("adaptive_confidence", True):
             lower_confidence = max(0.5, confidence - 0.2)
             self.logger.debug(f"降低置信度重试: {confidence:.3f} -> {lower_confidence:.3f}")
             return self._multi_method_matching(screenshot, template, lower_confidence, template_path)
