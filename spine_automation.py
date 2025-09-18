@@ -332,7 +332,7 @@ class SpineAutomation:
                 click_y = y
 
             click_x = 1341
-            click_y = 83
+            click_y = 88
             
             self.logger.info(f"准备点击位置: ({click_x}, {click_y})")
             
