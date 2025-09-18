@@ -89,20 +89,6 @@ class SpineAutomation:
         """测试点击功能"""
         self.click_manager.test_click_functionality()
     
-    def click_node_and_grid(self, node_template: str, grid_template: str, 
-                           window_region: Optional[Tuple[int, int, int, int]] = None) -> bool:
-        """
-        点击节点和网格按钮
-        
-        Args:
-            node_template: 节点模板路径
-            grid_template: 网格按钮模板路径
-            window_region: 窗口区域
-            
-        Returns:
-            操作是否成功
-        """
-        return self.automation_runner.click_node_and_grid(node_template, grid_template, window_region)
     
     def save_template_from_selection(self, name: str, region: Tuple[int, int, int, int]):
         """
