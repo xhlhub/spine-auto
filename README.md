@@ -1,6 +1,6 @@
 # Spine UI 自动化脚本
 
-自动化Spine软件中的筛选操作，循环点击附件子节点的Python脚本。
+自动化Spine软件中的筛选操作，循环点击附件子节点的跨平台Python脚本。
 
 ## 功能特性
 
@@ -11,6 +11,9 @@
 - ✅ 可配置的操作参数和目标子节点
 - ✅ 详细的操作日志记录
 - ✅ 错误处理和重试机制
+- ✅ **跨平台支持** (Windows, macOS, Linux)
+- ✅ **智能DPI检测** (自动适配高分辨率显示器)
+- ✅ **多种窗口激活策略** (确保兼容性)
 
 ## 自动化流程
 
@@ -20,6 +23,14 @@
 3. **点击附件节点** - 在左侧树中点击"附件"节点展开子项
 4. **循环点击子节点** - 依次点击所有配置的附件子节点
 
+## 系统支持
+
+| 操作系统 | 支持状态 | 特殊说明 |
+|---------|---------|---------|
+| **Windows 10/11** | ✅ 完全支持 | 推荐以管理员权限运行 |
+| **macOS** | ✅ 完全支持 | 需要辅助功能权限 |
+| **Linux** | ✅ 基本支持 | 可能需要xdotool |
+
 ## 安装步骤
 
 ### 1. 安装Python依赖
@@ -28,11 +39,27 @@
 pip install -r requirements.txt
 ```
 
-### 2. 安装额外依赖（macOS）
+**自动安装的平台特定依赖：**
+- Windows: `pywin32` (Windows API支持)
+- 所有平台: `psutil` (进程管理)
 
+### 2. 平台特定设置
+
+#### Windows用户
+详细设置请参考 [Windows设置指南](WINDOWS_SETUP.md)
+
+#### macOS用户
 ```bash
 # 如果遇到pygetwindow安装问题，可以尝试：
 pip install pyobjc-framework-Quartz
+```
+
+#### Linux用户
+```bash
+# 可选：安装xdotool以获得更好的窗口管理
+sudo apt-get install xdotool  # Ubuntu/Debian
+# 或
+sudo yum install xdotool      # CentOS/RHEL
 ```
 
 ## 使用方法
@@ -157,8 +184,10 @@ pip install pyobjc-framework-Quartz
    - 检查屏幕分辨率和缩放设置
    - 确保Spine窗口完全可见
 
-4. **权限问题（macOS）**
-   - 在系统偏好设置 > 安全性与隐私 > 隐私 > 辅助功能中，添加终端或Python的权限
+4. **权限问题**
+   - **macOS**: 在系统偏好设置 > 安全性与隐私 > 隐私 > 辅助功能中，添加终端或Python的权限
+   - **Windows**: 以管理员权限运行，检查杀毒软件设置
+   - **Linux**: 确保有足够的X11权限
 
 ### 调试技巧
 
@@ -192,10 +221,26 @@ pip install pyobjc-framework-Quartz
 
 ## 版本信息
 
-- 版本: 1.0.0
-- Python要求: 3.7+
-- 支持平台: macOS, Windows, Linux
-- 主要依赖: pyautogui, opencv-python, pillow
+- 版本: 2.0.0
+- Python要求: 3.8+
+- 支持平台: Windows, macOS, Linux
+- 主要依赖: pyautogui, opencv-python, pillow, pygetwindow
+- Windows特定: pywin32, psutil
+
+## 更新日志
+
+### v2.0.0 - 跨平台支持
+- ✅ 添加完整的Windows支持
+- ✅ 智能DPI/缩放检测 (Windows + macOS)
+- ✅ 多种窗口激活策略
+- ✅ 跨平台权限检查
+- ✅ Windows API集成
+- ✅ 改进的错误处理和调试信息
+
+### v1.0.0 - 初始版本
+- ✅ 基础macOS支持
+- ✅ 图像识别和自动点击
+- ✅ 配置文件管理
 
 ---
 

@@ -36,17 +36,29 @@ class AutomationRunner:
         
         # 步骤0: 检查系统权限
         if not self.window_manager.check_accessibility_permissions():
-            self.logger.error("系统权限检查失败，请配置辅助功能权限后重试")
+            self.logger.error("系统权限检查失败，请配置权限后重试")
             print("\n❌ 权限检查失败!")
-            print("请按以下步骤配置权限:")
-            print("1. 打开 系统偏好设置 > 安全性与隐私 > 隐私")
-            print("2. 选择左侧的 '辅助功能'")
-            print("3. 点击锁图标并输入密码")
-            print("4. 添加并勾选你的终端应用程序 (如 Terminal 或 iTerm)")
-            print("5. 重新运行此脚本")
+            
+            import platform
+            if platform.system() == "Darwin":
+                print("请按以下步骤配置macOS权限:")
+                print("1. 打开 系统偏好设置 > 安全性与隐私 > 隐私")
+                print("2. 选择左侧的 '辅助功能'")
+                print("3. 点击锁图标并输入密码")
+                print("4. 添加并勾选你的终端应用程序 (如 Terminal 或 iTerm)")
+                print("5. 重新运行此脚本")
+            elif platform.system() == "Windows":
+                print("请按以下步骤配置Windows权限:")
+                print("1. 建议以管理员权限运行此脚本")
+                print("2. 确保Windows Defender或其他安全软件没有阻止脚本")
+                print("3. 如果使用杀毒软件，请将此脚本添加到白名单")
+                print("4. 重新运行此脚本")
+            else:
+                print("请确保有足够的系统权限运行此脚本")
+            
             return
         else:
-            self.logger.info("✅ 辅助功能权限检查通过")
+            self.logger.info("✅ 系统权限检查通过")
         
         # 查找Spine窗口
         window_region = self.window_manager.find_spine_window()

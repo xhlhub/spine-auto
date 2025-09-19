@@ -38,18 +38,35 @@ class ClickManager:
     
     def detect_display_scaling(self) -> float:
         """
-        检测Mac显示器的缩放比例（DPR）
+        检测显示器的缩放比例（DPR）- 跨平台支持
         
         Returns:
             显示器缩放比例
         """
         try:
-            # 检查是否为macOS
-            if platform.system() != "Darwin":
-                self.logger.info("非macOS系统，使用默认缩放比例1.0")
-                return 1.0
+            system = platform.system()
             
-            self.logger.info("开始检测显示器DPR...")
+            if system == "Darwin":
+                return self._detect_macos_dpr()
+            elif system == "Windows":
+                return self._detect_windows_dpr()
+            else:
+                self.logger.info(f"系统 {system} 使用默认缩放比例1.0")
+                return 1.0
+                
+        except Exception as e:
+            self.logger.error(f"检测显示器缩放比例失败: {e}")
+            return 1.0
+    
+    def _detect_macos_dpr(self) -> float:
+        """
+        检测macOS显示器的缩放比例
+        
+        Returns:
+            显示器缩放比例
+        """
+        try:
+            self.logger.info("开始检测macOS显示器DPR...")
             
             # 方法1: 使用Cocoa框架直接获取backingScaleFactor (最准确的方法)
             try:
@@ -160,12 +177,123 @@ except Exception as e:
                 self.logger.debug(f"方法3失败: {e}")
             
             # 默认返回1.0
-            self.logger.warning("所有DPR检测方法都失败，使用默认值1.0")
+            self.logger.warning("所有macOS DPR检测方法都失败，使用默认值1.0")
             self.logger.warning("如果你的显示器是Retina屏幕，请在config.json中手动设置 'manual_dpr': 2.0")
             return 1.0
             
         except Exception as e:
-            self.logger.error(f"检测显示器缩放比例失败: {e}")
+            self.logger.error(f"检测macOS显示器缩放比例失败: {e}")
+            return 1.0
+    
+    def _detect_windows_dpr(self) -> float:
+        """
+        检测Windows显示器的缩放比例
+        
+        Returns:
+            显示器缩放比例
+        """
+        try:
+            self.logger.info("开始检测Windows显示器DPR...")
+            
+            # 方法1: 使用Windows API获取DPI
+            try:
+                self.logger.debug("尝试方法1: Windows API GetDpiForSystem")
+                import ctypes
+                from ctypes import wintypes
+                
+                # 获取系统DPI
+                user32 = ctypes.windll.user32
+                user32.SetProcessDPIAware()
+                
+                # 获取主显示器DPI
+                hdc = user32.GetDC(0)
+                dpi_x = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)  # LOGPIXELSX
+                dpi_y = ctypes.windll.gdi32.GetDeviceCaps(hdc, 90)  # LOGPIXELSY
+                user32.ReleaseDC(0, hdc)
+                
+                # 标准DPI是96
+                scale_x = dpi_x / 96.0
+                scale_y = dpi_y / 96.0
+                scale_factor = max(scale_x, scale_y)
+                
+                self.logger.info(f"方法1: 通过Windows API检测到DPI: {dpi_x}x{dpi_y}, 缩放比例: {scale_factor}")
+                return scale_factor
+                
+            except Exception as e:
+                self.logger.debug(f"方法1失败: {e}")
+            
+            # 方法2: 使用tkinter获取DPI信息
+            try:
+                self.logger.debug("尝试方法2: tkinter DPI检测")
+                import tkinter as tk
+                
+                root = tk.Tk()
+                root.withdraw()
+                
+                # 获取DPI
+                dpi = root.winfo_fpixels('1i')
+                scale_factor = dpi / 96.0
+                
+                root.destroy()
+                
+                self.logger.info(f"方法2: 通过tkinter检测到DPI: {dpi}, 缩放比例: {scale_factor}")
+                return scale_factor
+                
+            except Exception as e:
+                self.logger.debug(f"方法2失败: {e}")
+            
+            # 方法3: 使用pyautogui和tkinter比较屏幕尺寸
+            try:
+                self.logger.debug("尝试方法3: 屏幕尺寸比较")
+                import tkinter as tk
+                
+                # 获取pyautogui的屏幕尺寸 (物理像素)
+                screen_width, screen_height = pyautogui.size()
+                self.logger.debug(f"pyautogui屏幕尺寸: {screen_width}x{screen_height}")
+                
+                # 创建临时窗口获取逻辑尺寸
+                root = tk.Tk()
+                root.withdraw()
+                
+                # 获取tkinter的屏幕尺寸 (逻辑像素)
+                tk_width = root.winfo_screenwidth()
+                tk_height = root.winfo_screenheight()
+                
+                root.destroy()
+                
+                self.logger.debug(f"tkinter屏幕尺寸: {tk_width}x{tk_height}")
+                
+                # 比较尺寸差异来确定缩放比例
+                if tk_width > 0 and tk_height > 0:
+                    width_ratio = screen_width / tk_width
+                    height_ratio = screen_height / tk_height
+                    avg_ratio = (width_ratio + height_ratio) / 2
+                    
+                    self.logger.debug(f"尺寸比例 - 宽度: {width_ratio:.2f}, 高度: {height_ratio:.2f}, 平均: {avg_ratio:.2f}")
+                    
+                    # 根据比例确定缩放级别
+                    if avg_ratio >= 2.75:
+                        dpr = 3.0
+                    elif avg_ratio >= 1.75:
+                        dpr = 2.0
+                    elif avg_ratio >= 1.25:
+                        dpr = 1.5
+                    else:
+                        dpr = 1.0
+                    
+                    self.logger.info(f"方法3: 通过尺寸比较检测到DPR: {dpr}")
+                    return dpr
+                
+            except Exception as e:
+                self.logger.debug(f"方法3失败: {e}")
+            
+            # 默认返回1.0
+            self.logger.warning("所有Windows DPR检测方法都失败，使用默认值1.0")
+            self.logger.warning("如果你的显示器是高DPI屏幕，请在config.json中手动设置 'manual_dpr': 1.25/1.5/2.0")
+            return 1.0
+            
+        except Exception as e:
+            self.logger.error(f"检测Windows显示器缩放比例失败: {e}")
             return 1.0
     
     def click_at_position(self, x: int, y: int, window_region: Optional[Tuple[int, int, int, int]] = None):
@@ -220,10 +348,23 @@ except Exception as e:
             return None
     
     def _ensure_spine_window_active(self):
-        """确保Spine窗口处于活动状态"""
+        """确保Spine窗口处于活动状态（跨平台）"""
         try:
             app_name = self.config_manager.get("app_name", "Spine")
             
+            if platform.system() == "Darwin":
+                self._ensure_window_active_macos(app_name)
+            elif platform.system() == "Windows":
+                self._ensure_window_active_windows(app_name)
+            else:
+                self._ensure_window_active_linux(app_name)
+                
+        except Exception as e:
+            self.logger.warning(f"激活窗口时出错: {e}")
+    
+    def _ensure_window_active_macos(self, app_name: str):
+        """macOS窗口激活"""
+        try:
             # 使用AppleScript激活窗口
             activate_script = f'''
             try
@@ -243,10 +384,78 @@ except Exception as e:
             if result.returncode == 0 and "success" in result.stdout:
                 self.logger.debug(f"{app_name}窗口已激活")
             else:
-                self.logger.warning(f"窗口激活可能失败: {result.stdout}")
+                self.logger.warning(f"macOS窗口激活可能失败: {result.stdout}")
                 
         except Exception as e:
-            self.logger.warning(f"激活窗口时出错: {e}")
+            self.logger.warning(f"macOS窗口激活出错: {e}")
+    
+    def _ensure_window_active_windows(self, app_name: str):
+        """Windows窗口激活"""
+        try:
+            import pygetwindow as gw
+            
+            window_title = self.config_manager.get("window_title", "Spine")
+            windows = gw.getWindowsWithTitle(window_title)
+            
+            if windows:
+                window = windows[0]
+                if window.isMinimized:
+                    window.restore()
+                window.activate()
+                self.logger.debug(f"{app_name}窗口已激活")
+            else:
+                # 尝试使用Windows API
+                try:
+                    import win32gui
+                    import win32con
+                    
+                    def enum_callback(hwnd, windows):
+                        if win32gui.IsWindowVisible(hwnd):
+                            window_text = win32gui.GetWindowText(hwnd)
+                            if window_title.lower() in window_text.lower():
+                                windows.append(hwnd)
+                        return True
+                    
+                    windows = []
+                    win32gui.EnumWindows(enum_callback, windows)
+                    
+                    if windows:
+                        hwnd = windows[0]
+                        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                        win32gui.SetForegroundWindow(hwnd)
+                        self.logger.debug(f"通过Windows API激活{app_name}窗口")
+                        
+                except ImportError:
+                    self.logger.warning("pywin32未安装，无法使用Windows API激活窗口")
+                except Exception as e:
+                    self.logger.warning(f"Windows API激活失败: {e}")
+                    
+        except Exception as e:
+            self.logger.warning(f"Windows窗口激活出错: {e}")
+    
+    def _ensure_window_active_linux(self, app_name: str):
+        """Linux窗口激活"""
+        try:
+            import pygetwindow as gw
+            
+            window_title = self.config_manager.get("window_title", "Spine")
+            windows = gw.getWindowsWithTitle(window_title)
+            
+            if windows:
+                window = windows[0]
+                window.activate()
+                self.logger.debug(f"{app_name}窗口已激活")
+            else:
+                # 尝试使用xdotool
+                try:
+                    subprocess.run(['xdotool', 'search', '--name', window_title, 'windowactivate'], 
+                                  check=True, timeout=3)
+                    self.logger.debug(f"通过xdotool激活{app_name}窗口")
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    self.logger.warning("xdotool不可用，无法激活窗口")
+                    
+        except Exception as e:
+            self.logger.warning(f"Linux窗口激活出错: {e}")
     
     def _enhanced_click(self, x: int, y: int) -> bool:
         """
@@ -321,8 +530,11 @@ except Exception as e:
             return False
     
     def _applescript_click(self, x: int, y: int) -> bool:
-        """使用AppleScript点击"""
+        """使用AppleScript点击（仅macOS）"""
         try:
+            if platform.system() != "Darwin":
+                return False
+                
             click_script = f'''
             tell application "System Events"
                 click at {{{x}, {y}}}

@@ -33,11 +33,27 @@ def create_directories():
         return False
 
 def check_system_permissions():
-    """检查系统权限（macOS）"""
-    if sys.platform == "darwin":
+    """检查系统权限（跨平台）"""
+    import platform
+    
+    if platform.system() == "Darwin":
         print("\n⚠️  macOS权限提示:")
         print("请确保在'系统偏好设置 > 安全性与隐私 > 隐私 > 辅助功能'中")
         print("添加Python或终端的权限，否则脚本无法控制鼠标和键盘")
+        print("\n按回车键继续...")
+        input()
+    elif platform.system() == "Windows":
+        print("\n⚠️  Windows权限提示:")
+        print("为了获得最佳兼容性，建议:")
+        print("1. 以管理员权限运行此脚本")
+        print("2. 确保Windows Defender没有阻止脚本运行")
+        print("3. 如果使用第三方杀毒软件，请将脚本添加到白名单")
+        print("4. 确保Spine应用程序正在运行")
+        print("\n按回车键继续...")
+        input()
+    else:
+        print(f"\n⚠️  {platform.system()}系统提示:")
+        print("请确保有足够的权限运行自动化脚本")
         print("\n按回车键继续...")
         input()
 
