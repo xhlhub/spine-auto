@@ -60,6 +60,10 @@ class AutomationRunner:
         else:
             self.logger.info("✅ 系统权限检查通过")
         
+        # 步骤0.5: 激活Spine应用窗口（Windows上特别重要）
+        if not self.activate_spine_application():
+            self.logger.warning("无法激活Spine应用，继续执行但可能影响截图效果")
+        
         # 查找Spine窗口
         window_region = self.window_manager.find_spine_window()
         print(window_region)
@@ -135,6 +139,58 @@ class AutomationRunner:
             self.logger.error(f"自动化流程执行失败: {e}")
         
         self.logger.info("自动化流程完成")
+    
+    def activate_spine_application(self) -> bool:
+        """
+        激活Spine应用窗口（Windows上特别重要，解决截图黑屏问题）
+        
+        Returns:
+            bool: 激活成功返回True，失败返回False
+        """
+        import platform
+        
+        self.logger.info("正在激活Spine应用窗口...")
+        
+        try:
+            # 使用WindowManager的激活方法
+            success = self.window_manager.activate_spine_window()
+            
+            if success:
+                self.logger.info("✅ Spine应用窗口激活成功")
+                
+                # 在Windows上添加额外的延时确保窗口完全激活
+                if platform.system() == "Windows":
+                    self.logger.info("Windows系统检测到，等待10秒确保窗口完全激活...")
+                    print("⏳ 正在等待Spine应用完全激活（10秒）...")
+                    time.sleep(10.0)
+                    self.logger.info("✅ 窗口激活等待完成")
+                else:
+                    # 其他系统等待较短时间
+                    time.sleep(2.0)
+                
+                return True
+            else:
+                self.logger.warning("❌ Spine应用窗口激活失败")
+                
+                # 在Windows上，即使激活失败也等待一段时间，给用户手动切换的机会
+                if platform.system() == "Windows":
+                    self.logger.info("Windows系统上建议手动切换到Spine应用")
+                    print("⚠️  无法自动激活Spine应用")
+                    print("请手动切换到Spine应用窗口，脚本将在10秒后继续...")
+                    time.sleep(10.0)
+                
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"激活Spine应用时发生错误: {e}")
+            
+            # 发生错误时，在Windows上也给用户手动切换的机会
+            if platform.system() == "Windows":
+                print("⚠️  激活Spine应用时发生错误")
+                print("请手动切换到Spine应用窗口，脚本将在10秒后继续...")
+                time.sleep(10.0)
+            
+            return False
     
     def click_filter_icon(self, window_region: Optional[Tuple[int, int, int, int]] = None, isImgProcess: bool = False) -> bool:
         """点击筛选图标"""

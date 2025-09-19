@@ -33,7 +33,7 @@ class TemplateManager:
     
     def take_screenshot(self, region: Optional[Tuple[int, int, int, int]] = None, name: Optional[str] = None) -> np.ndarray:
         """
-        截取屏幕或指定区域
+        截取屏幕或指定区域（针对Windows优化，解决黑屏问题）
         
         Args:
             region: 截图区域 (x, y, width, height)
@@ -42,27 +42,143 @@ class TemplateManager:
         Returns:
             截图的numpy数组
         """
+        import platform
+        import time
+        
         try:
-            if region:
-                screenshot = pyautogui.screenshot(region=region)
+            # Windows上的特殊处理，确保截图质量
+            if platform.system() == "Windows":
+                # 短暂延时确保窗口渲染完成
+                time.sleep(0.1)
+                
+                # 尝试多种截图方法
+                screenshot = self._take_screenshot_windows_optimized(region)
+                if screenshot is None:
+                    self.logger.warning("Windows优化截图失败，使用标准方法")
+                    screenshot = self._take_screenshot_standard(region)
             else:
-                screenshot = pyautogui.screenshot()
+                # 其他系统使用标准方法
+                screenshot = self._take_screenshot_standard(region)
+            
+            if screenshot is None:
+                self.logger.error("所有截图方法都失败了")
+                return None
             
             # 转换为opencv格式
             screenshot_cv = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+            
+            # 检查截图是否为黑屏（Windows常见问题）
+            if self._is_screenshot_black(screenshot_cv):
+                self.logger.warning("检测到黑屏截图，可能需要激活目标应用窗口")
+                if platform.system() == "Windows":
+                    self.logger.info("建议确保Spine应用窗口处于前台")
 
             # 新增：将截图保存为本地图片，文件名带时间戳（调试模式下）
-            # if self.config_manager.get("debug_mode", False) and name:
-            #     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            #     save_path = f"screenshot_{name}_{timestamp}.png"
-            #     cv2.imwrite(save_path, screenshot_cv)
-            #     self.logger.info(f"截图已保存到本地: {save_path}")
+            if self.config_manager.get("debug_mode", False) and name:
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                save_path = f"screenshot_{name}_{timestamp}.png"
+                cv2.imwrite(save_path, screenshot_cv)
+                self.logger.info(f"截图已保存到本地: {save_path}")
 
             return screenshot_cv
             
         except Exception as e:
             self.logger.error(f"截图失败: {e}")
             return None
+    
+    def _take_screenshot_standard(self, region: Optional[Tuple[int, int, int, int]] = None):
+        """标准截图方法"""
+        try:
+            if region:
+                return pyautogui.screenshot(region=region)
+            else:
+                return pyautogui.screenshot()
+        except Exception as e:
+            self.logger.error(f"标准截图失败: {e}")
+            return None
+    
+    def _take_screenshot_windows_optimized(self, region: Optional[Tuple[int, int, int, int]] = None):
+        """Windows优化截图方法"""
+        try:
+            # 方法1: 使用PIL和Windows API
+            try:
+                import win32gui
+                import win32ui
+                import win32con
+                import win32api
+                from PIL import Image
+                
+                # 获取桌面设备上下文
+                hdesktop = win32gui.GetDesktopWindow()
+                desktop_dc = win32gui.GetWindowDC(hdesktop)
+                img_dc = win32ui.CreateDCFromHandle(desktop_dc)
+                mem_dc = img_dc.CreateCompatibleDC()
+                
+                if region:
+                    x, y, width, height = region
+                else:
+                    # 获取屏幕尺寸
+                    x, y = 0, 0
+                    width = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
+                    height = win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
+                
+                # 创建位图
+                screenshot_bmp = win32ui.CreateBitmap()
+                screenshot_bmp.CreateCompatibleBitmap(img_dc, width, height)
+                mem_dc.SelectObject(screenshot_bmp)
+                
+                # 复制屏幕内容
+                mem_dc.BitBlt((0, 0), (width, height), img_dc, (x, y), win32con.SRCCOPY)
+                
+                # 转换为PIL图像
+                bmpinfo = screenshot_bmp.GetInfo()
+                bmpstr = screenshot_bmp.GetBitmapBits(True)
+                screenshot = Image.frombuffer(
+                    'RGB',
+                    (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
+                    bmpstr, 'raw', 'BGRX', 0, 1
+                )
+                
+                # 清理资源
+                mem_dc.DeleteDC()
+                win32gui.ReleaseDC(hdesktop, desktop_dc)
+                
+                self.logger.debug("使用Windows API截图成功")
+                return screenshot
+                
+            except ImportError:
+                self.logger.debug("pywin32未安装，无法使用Windows API截图")
+            except Exception as e:
+                self.logger.debug(f"Windows API截图失败: {e}")
+            
+            # 方法2: 使用pyautogui但添加延时
+            import time
+            time.sleep(0.2)  # 额外延时
+            return self._take_screenshot_standard(region)
+            
+        except Exception as e:
+            self.logger.debug(f"Windows优化截图失败: {e}")
+            return None
+    
+    def _is_screenshot_black(self, screenshot_cv: np.ndarray) -> bool:
+        """检查截图是否为黑屏"""
+        try:
+            # 计算图像的平均亮度
+            gray = cv2.cvtColor(screenshot_cv, cv2.COLOR_BGR2GRAY)
+            mean_brightness = np.mean(gray)
+            
+            # 如果平均亮度很低，可能是黑屏
+            black_threshold = 10  # 可调整的阈值
+            is_black = mean_brightness < black_threshold
+            
+            if is_black:
+                self.logger.debug(f"截图平均亮度: {mean_brightness:.2f} (阈值: {black_threshold})")
+            
+            return is_black
+            
+        except Exception as e:
+            self.logger.debug(f"检查黑屏失败: {e}")
+            return False
     
     def find_template(self, screenshot: np.ndarray, template_path: str, 
                      confidence: float = 0.8) -> Optional[Tuple[int, int]]:
