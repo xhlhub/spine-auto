@@ -126,11 +126,38 @@ sudo yum install xdotool      # CentOS/RHEL
 
 | 参数 | 类型 | 描述 | 默认值 |
 |------|------|------|--------|
-| `window_title` | string | Spine窗口标题关键词 | "Spine" |
+| `window_titles` | array | 多个窗口标题列表 | ["Spine", "Spine Trial", "Spine Pro"] |
+| `app_names` | array | 多个应用程序名称列表 | ["Spine", "Spine Trial", "Spine Pro"] |
 | `click_delay` | float | 点击操作间隔(秒) | 1.0 |
 | `operation_delay` | float | 完成一个节点操作后的等待时间(秒) | 2.0 |
 | `confidence_threshold` | float | 图像匹配置信度阈值 | 0.8 |
 | `max_retries` | int | 操作失败最大重试次数 | 3 |
+
+### 多窗口标题配置
+
+配置多个窗口标题和应用名称，脚本会自动尝试匹配任意一个：
+
+```json
+{
+  "window_titles": [
+    "Spine",
+    "Spine Trial", 
+    "Spine Pro",
+    "Spine Esoteric Software"
+  ],
+  "app_names": [
+    "Spine",
+    "Spine Trial",
+    "Spine Pro", 
+    "Spine Esoteric Software"
+  ]
+}
+```
+
+**匹配规则**：
+- 脚本会按数组顺序尝试匹配窗口标题
+- 找到第一个匹配的窗口就会使用
+- 建议将最常用的标题放在数组前面
 
 ## 模板制作指南
 

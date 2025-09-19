@@ -1,5 +1,17 @@
 {
-  "window_title": "Spine Trial Spine",
+  "window_titles": [
+    "Spine Trial Spine",
+    "Spine",
+    "Spine Trial",
+    "Spine Pro",
+    "Spine Esoteric Software"
+  ],
+  "app_names": [
+    "Spine Trial",
+    "Spine",
+    "Spine Pro",
+    "Spine Esoteric Software"
+  ],
   "click_delay": 1.0,
   "operation_delay": 0.3,
   "confidence_threshold": 0.93,
@@ -8,7 +20,10 @@
   "matching_algorithm": "enhanced",
   "enable_multi_scale": true,
   "enable_preprocessing": true,
-  "scale_range": [0.8, 1.2],
+  "scale_range": [
+    0.8,
+    1.2
+  ],
   "adaptive_confidence": false,
   "confidence_diff_threshold": 0.05,
   "tree_region": {
@@ -24,6 +39,5 @@
     "height": 200
   },
   "node_height": 22,
-  "app_name": "Spine Trial",
   "isImgProcess": false
 }

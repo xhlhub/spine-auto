@@ -9,7 +9,7 @@
 import json
 import os
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List, Union
 
 
 class ConfigManager:
@@ -45,8 +45,10 @@ class ConfigManager:
     def create_default_config(self):
         """创建默认配置文件"""
         self.config = {
-            "window_title": "Spine",  # Spine窗口标题关键词
-            "app_name": None,  # 应用程序名称，None时自动检测
+            # 窗口标题配置 - 使用数组模式
+            "window_titles": ["Spine", "Spine Trial", "Spine Pro", "Spine Esoteric Software"],
+            # 应用程序名称配置 - 使用数组模式
+            "app_names": ["Spine", "Spine Trial", "Spine Pro", "Spine Esoteric Software"],
             "click_delay": 5.0,  # 点击间隔(秒)
             "operation_delay": 2.0,  # 操作完成等待时间(秒)
             "confidence_threshold": 0.8,  # 图像匹配置信度
@@ -93,3 +95,63 @@ class ConfigManager:
     def update(self, updates: Dict[str, Any]):
         """批量更新配置项"""
         self.config.update(updates)
+    
+    def get_window_titles(self) -> List[str]:
+        """
+        获取所有可能的窗口标题
+        
+        Returns:
+            窗口标题列表
+        """
+        window_titles = self.config.get("window_titles", ["Spine"])
+        
+        # 确保返回的是列表
+        if not isinstance(window_titles, list):
+            window_titles = ["Spine"]
+        
+        # 去重并过滤空值
+        return list(filter(None, list(dict.fromkeys(window_titles))))
+    
+    def get_app_names(self) -> List[str]:
+        """
+        获取所有可能的应用程序名称
+        
+        Returns:
+            应用程序名称列表
+        """
+        app_names = self.config.get("app_names", ["Spine", "Spine Trial", "Spine Pro", "Spine Esoteric Software"])
+        
+        # 确保返回的是列表
+        if not isinstance(app_names, list):
+            app_names = ["Spine", "Spine Trial", "Spine Pro", "Spine Esoteric Software"]
+        
+        # 去重并过滤空值
+        return list(filter(None, list(dict.fromkeys(app_names))))
+    
+    def add_window_title(self, title: str):
+        """
+        添加新的窗口标题
+        
+        Args:
+            title: 新的窗口标题
+        """
+        if "window_titles" not in self.config:
+            self.config["window_titles"] = ["Spine"]
+        
+        if title and title not in self.config["window_titles"]:
+            self.config["window_titles"].append(title)
+            self.logger.info(f"添加新的窗口标题: {title}")
+    
+    def add_app_name(self, name: str):
+        """
+        添加新的应用程序名称
+        
+        Args:
+            name: 新的应用程序名称
+        """
+        if "app_names" not in self.config:
+            self.config["app_names"] = ["Spine"]
+        
+        if name and name not in self.config["app_names"]:
+            self.config["app_names"].append(name)
+            self.logger.info(f"添加新的应用程序名称: {name}")

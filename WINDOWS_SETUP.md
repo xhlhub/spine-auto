@@ -120,8 +120,18 @@ Windows系统支持自动检测显示器DPI缩放，但如果检测不准确，�
 Windows系统推荐配置 (`config.json`)：
 ```json
 {
-  "window_title": "Spine",
-  "app_name": "Spine",
+  "window_titles": [
+    "Spine",
+    "Spine Trial",
+    "Spine Pro",
+    "Spine Esoteric Software"
+  ],
+  "app_names": [
+    "Spine",
+    "Spine Trial", 
+    "Spine Pro",
+    "Spine Esoteric Software"
+  ],
   "confidence_threshold": 0.8,
   "click_delay": 3.0,
   "operation_delay": 2.0,
@@ -131,6 +141,31 @@ Windows系统推荐配置 (`config.json`)：
   "confidence_diff_threshold": 0.05
 }
 ```
+
+### 多窗口标题配置
+
+Windows版本支持多个窗口标题匹配，适用于不同版本的Spine应用：
+
+**常见的Spine窗口标题**：
+- `"Spine"` - 基础版本
+- `"Spine Trial"` - 试用版本  
+- `"Spine Pro"` - 专业版本
+- `"Spine Esoteric Software"` - 完整标题
+- `"Spine 4.2"` - 带版本号的标题
+
+**配置建议**：
+```json
+{
+  "window_titles": [
+    "你的实际窗口标题",
+    "Spine Trial",
+    "Spine Pro", 
+    "Spine"
+  ]
+}
+```
+
+脚本会按顺序尝试匹配，找到第一个匹配的窗口就会使用。
 
 ## 兼容性说明
 

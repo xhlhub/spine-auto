@@ -350,109 +350,123 @@ except Exception as e:
     def _ensure_spine_window_active(self):
         """确保Spine窗口处于活动状态（跨平台）"""
         try:
-            app_name = self.config_manager.get("app_name", "Spine")
-            
             if platform.system() == "Darwin":
-                self._ensure_window_active_macos(app_name)
+                self._ensure_window_active_macos(None)
             elif platform.system() == "Windows":
-                self._ensure_window_active_windows(app_name)
+                self._ensure_window_active_windows(None)
             else:
-                self._ensure_window_active_linux(app_name)
+                self._ensure_window_active_linux(None)
                 
         except Exception as e:
             self.logger.warning(f"激活窗口时出错: {e}")
     
     def _ensure_window_active_macos(self, app_name: str):
-        """macOS窗口激活"""
-        try:
-            # 使用AppleScript激活窗口
-            activate_script = f'''
-            try
-                tell application "{app_name}"
-                    activate
-                end tell
-                delay 0.3
-                return "success"
-            on error errMsg
-                return "error: " & errMsg
-            end try
-            '''
-            
-            result = subprocess.run(['osascript', '-e', activate_script], 
-                                   capture_output=True, text=True, timeout=3)
-            
-            if result.returncode == 0 and "success" in result.stdout:
-                self.logger.debug(f"{app_name}窗口已激活")
-            else:
-                self.logger.warning(f"macOS窗口激活可能失败: {result.stdout}")
+        """macOS窗口激活（支持多个应用名称）"""
+        app_names = self.config_manager.get_app_names()
+        
+        for name in app_names:
+            try:
+                # 使用AppleScript激活窗口
+                activate_script = f'''
+                try
+                    tell application "{name}"
+                        activate
+                    end tell
+                    delay 0.3
+                    return "success"
+                on error errMsg
+                    return "error: " & errMsg
+                end try
+                '''
                 
-        except Exception as e:
-            self.logger.warning(f"macOS窗口激活出错: {e}")
+                result = subprocess.run(['osascript', '-e', activate_script], 
+                                       capture_output=True, text=True, timeout=3)
+                
+                if result.returncode == 0 and "success" in result.stdout:
+                    self.logger.debug(f"{name}窗口已激活")
+                    return
+                else:
+                    self.logger.debug(f"macOS激活{name}失败: {result.stdout}")
+                    
+            except Exception as e:
+                self.logger.debug(f"macOS激活{name}出错: {e}")
+                continue
     
     def _ensure_window_active_windows(self, app_name: str):
-        """Windows窗口激活"""
+        """Windows窗口激活（支持多个标题匹配）"""
         try:
             import pygetwindow as gw
             
-            window_title = self.config_manager.get("window_title", "Spine")
-            windows = gw.getWindowsWithTitle(window_title)
+            window_titles = self.config_manager.get_window_titles()
             
-            if windows:
-                window = windows[0]
-                if window.isMinimized:
-                    window.restore()
-                window.activate()
-                self.logger.debug(f"{app_name}窗口已激活")
-            else:
-                # 尝试使用Windows API
-                try:
-                    import win32gui
-                    import win32con
+            # 尝试pygetwindow
+            for window_title in window_titles:
+                windows = gw.getWindowsWithTitle(window_title)
+                if windows:
+                    window = windows[0]
+                    if window.isMinimized:
+                        window.restore()
+                    window.activate()
+                    self.logger.debug(f"通过pygetwindow激活窗口: {window_title}")
+                    return
+            
+            # 尝试使用Windows API
+            try:
+                import win32gui
+                import win32con
+                
+                def enum_callback(hwnd, windows):
+                    if win32gui.IsWindowVisible(hwnd):
+                        window_text = win32gui.GetWindowText(hwnd)
+                        for title in window_titles:
+                            if title.lower() in window_text.lower():
+                                windows.append((hwnd, window_text, title))
+                                return True
+                    return True
+                
+                windows = []
+                win32gui.EnumWindows(enum_callback, windows)
+                
+                if windows:
+                    hwnd, window_text, matched_title = windows[0]
+                    win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                    win32gui.SetForegroundWindow(hwnd)
+                    self.logger.debug(f"通过Windows API激活窗口: {window_text} (匹配: {matched_title})")
                     
-                    def enum_callback(hwnd, windows):
-                        if win32gui.IsWindowVisible(hwnd):
-                            window_text = win32gui.GetWindowText(hwnd)
-                            if window_title.lower() in window_text.lower():
-                                windows.append(hwnd)
-                        return True
-                    
-                    windows = []
-                    win32gui.EnumWindows(enum_callback, windows)
-                    
-                    if windows:
-                        hwnd = windows[0]
-                        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-                        win32gui.SetForegroundWindow(hwnd)
-                        self.logger.debug(f"通过Windows API激活{app_name}窗口")
-                        
-                except ImportError:
-                    self.logger.warning("pywin32未安装，无法使用Windows API激活窗口")
-                except Exception as e:
-                    self.logger.warning(f"Windows API激活失败: {e}")
+            except ImportError:
+                self.logger.warning("pywin32未安装，无法使用Windows API激活窗口")
+            except Exception as e:
+                self.logger.warning(f"Windows API激活失败: {e}")
                     
         except Exception as e:
             self.logger.warning(f"Windows窗口激活出错: {e}")
     
     def _ensure_window_active_linux(self, app_name: str):
-        """Linux窗口激活"""
+        """Linux窗口激活（支持多个标题匹配）"""
         try:
             import pygetwindow as gw
             
-            window_title = self.config_manager.get("window_title", "Spine")
-            windows = gw.getWindowsWithTitle(window_title)
+            window_titles = self.config_manager.get_window_titles()
             
-            if windows:
-                window = windows[0]
-                window.activate()
-                self.logger.debug(f"{app_name}窗口已激活")
-            else:
-                # 尝试使用xdotool
+            # 尝试pygetwindow
+            for window_title in window_titles:
+                windows = gw.getWindowsWithTitle(window_title)
+                if windows:
+                    window = windows[0]
+                    window.activate()
+                    self.logger.debug(f"Linux窗口激活成功: {window_title}")
+                    return
+            
+            # 尝试使用xdotool
+            for window_title in window_titles:
                 try:
                     subprocess.run(['xdotool', 'search', '--name', window_title, 'windowactivate'], 
                                   check=True, timeout=3)
-                    self.logger.debug(f"通过xdotool激活{app_name}窗口")
+                    self.logger.debug(f"通过xdotool激活窗口: {window_title}")
+                    return
                 except (subprocess.CalledProcessError, FileNotFoundError):
-                    self.logger.warning("xdotool不可用，无法激活窗口")
+                    self.logger.debug(f"xdotool激活{window_title}失败")
+                    continue
                     
         except Exception as e:
             self.logger.warning(f"Linux窗口激活出错: {e}")
