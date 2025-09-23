@@ -189,111 +189,41 @@ except Exception as e:
         """
         检测Windows显示器的缩放比例
         
+        在Windows系统中，DPR固定返回1.0，因为Windows的屏幕缩放值
+        与实际需要的DPR计算不匹配，直接使用1.0可以得到正确的坐标计算结果
+        
         Returns:
-            显示器缩放比例
+            显示器缩放比例 (固定返回1.0)
         """
         try:
-            self.logger.info("开始检测Windows显示器DPR...")
+            self.logger.info("Windows系统DPR设置为固定值1.0")
             
-            # 方法1: 使用Windows API获取DPI
+            # 记录检测到的系统缩放信息（仅用于日志，不影响返回值）
             try:
-                self.logger.debug("尝试方法1: Windows API GetDpiForSystem")
                 import ctypes
-                from ctypes import wintypes
-                
-                # 获取系统DPI
                 user32 = ctypes.windll.user32
                 user32.SetProcessDPIAware()
                 
-                # 获取主显示器DPI
                 hdc = user32.GetDC(0)
                 dpi_x = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)  # LOGPIXELSX
                 dpi_y = ctypes.windll.gdi32.GetDeviceCaps(hdc, 90)  # LOGPIXELSY
                 user32.ReleaseDC(0, hdc)
                 
-                # 标准DPI是96
                 scale_x = dpi_x / 96.0
                 scale_y = dpi_y / 96.0
-                scale_factor = max(scale_x, scale_y)
+                detected_scale = max(scale_x, scale_y)
                 
-                self.logger.info(f"方法1: 通过Windows API检测到DPI: {dpi_x}x{dpi_y}, 缩放比例: {scale_factor}")
-                return scale_factor
-                
-            except Exception as e:
-                self.logger.debug(f"方法1失败: {e}")
-            
-            # 方法2: 使用tkinter获取DPI信息
-            try:
-                self.logger.debug("尝试方法2: tkinter DPI检测")
-                import tkinter as tk
-                
-                root = tk.Tk()
-                root.withdraw()
-                
-                # 获取DPI
-                dpi = root.winfo_fpixels('1i')
-                scale_factor = dpi / 96.0
-                
-                root.destroy()
-                
-                self.logger.info(f"方法2: 通过tkinter检测到DPI: {dpi}, 缩放比例: {scale_factor}")
-                return scale_factor
+                self.logger.info(f"系统检测到的DPI缩放: {detected_scale} (DPI: {dpi_x}x{dpi_y})")
+                self.logger.info("但Windows系统DPR固定使用1.0以确保坐标计算正确")
                 
             except Exception as e:
-                self.logger.debug(f"方法2失败: {e}")
+                self.logger.debug(f"获取系统DPI信息失败: {e}")
             
-            # 方法3: 使用pyautogui和tkinter比较屏幕尺寸
-            try:
-                self.logger.debug("尝试方法3: 屏幕尺寸比较")
-                import tkinter as tk
-                
-                # 获取pyautogui的屏幕尺寸 (物理像素)
-                screen_width, screen_height = pyautogui.size()
-                self.logger.debug(f"pyautogui屏幕尺寸: {screen_width}x{screen_height}")
-                
-                # 创建临时窗口获取逻辑尺寸
-                root = tk.Tk()
-                root.withdraw()
-                
-                # 获取tkinter的屏幕尺寸 (逻辑像素)
-                tk_width = root.winfo_screenwidth()
-                tk_height = root.winfo_screenheight()
-                
-                root.destroy()
-                
-                self.logger.debug(f"tkinter屏幕尺寸: {tk_width}x{tk_height}")
-                
-                # 比较尺寸差异来确定缩放比例
-                if tk_width > 0 and tk_height > 0:
-                    width_ratio = screen_width / tk_width
-                    height_ratio = screen_height / tk_height
-                    avg_ratio = (width_ratio + height_ratio) / 2
-                    
-                    self.logger.debug(f"尺寸比例 - 宽度: {width_ratio:.2f}, 高度: {height_ratio:.2f}, 平均: {avg_ratio:.2f}")
-                    
-                    # 根据比例确定缩放级别
-                    if avg_ratio >= 2.75:
-                        dpr = 3.0
-                    elif avg_ratio >= 1.75:
-                        dpr = 2.0
-                    elif avg_ratio >= 1.25:
-                        dpr = 1.5
-                    else:
-                        dpr = 1.0
-                    
-                    self.logger.info(f"方法3: 通过尺寸比较检测到DPR: {dpr}")
-                    return dpr
-                
-            except Exception as e:
-                self.logger.debug(f"方法3失败: {e}")
-            
-            # 默认返回1.0
-            self.logger.warning("所有Windows DPR检测方法都失败，使用默认值1.0")
-            self.logger.warning("如果你的显示器是高DPI屏幕，请在config.json中手动设置 'manual_dpr': 1.25/1.5/2.0")
+            # Windows系统固定返回1.0
             return 1.0
             
         except Exception as e:
-            self.logger.error(f"检测Windows显示器缩放比例失败: {e}")
+            self.logger.error(f"Windows DPR设置失败: {e}")
             return 1.0
     
     def click_at_position(self, x: int, y: int, window_region: Optional[Tuple[int, int, int, int]] = None):
@@ -331,6 +261,11 @@ except Exception as e:
             
             # 确保Spine窗口处于活动状态
             self._ensure_spine_window_active()
+            
+            # 先移动鼠标到目标位置
+            self.logger.info(f"移动鼠标到位置: ({click_x}, {click_y})")
+            pyautogui.moveTo(click_x, click_y, duration=0.3)
+            time.sleep(0.2)  # 等待鼠标移动完成
             
             # 使用增强的点击方法
             success = self._enhanced_click(click_x, click_y)
@@ -543,6 +478,21 @@ except Exception as e:
             self.logger.debug(f"PyAutoGUI按下释放失败: {e}")
             return False
     
+    def select_all(self) -> bool:
+        """
+        执行Ctrl+A全选操作
+        
+        Returns:
+            bool: 操作是否成功
+        """
+        try:
+            self.logger.info("执行Ctrl+A全选操作")
+            pyautogui.hotkey('ctrl', 'a')
+            return True
+        except Exception as e:
+            self.logger.error(f"Ctrl+A全选操作失败: {e}")
+            return False
+    
     def _applescript_click(self, x: int, y: int) -> bool:
         """使用AppleScript点击（仅macOS）"""
         try:
@@ -750,3 +700,53 @@ except Exception as e:
             print(f"❌ 检查应用程序状态失败: {e}")
         
         print("\n=== 调试完成 ===")
+    
+    def scroll_down(self, x: int, y: int, window_region: Optional[Tuple[int, int, int, int]] = None) -> bool:
+        """
+        在指定位置向下滚动固定一个单位
+        
+        Args:
+            x: 滚动位置的x坐标
+            y: 滚动位置的y坐标
+            window_region: 窗口区域，用于坐标转换
+            
+        Returns:
+            bool: 滚动是否成功
+        """
+        try:
+            # 应用DPR修正
+            corrected_x = x / self.dpr
+            corrected_y = y / self.dpr
+            
+            # 如果有窗口区域信息，需要转换坐标
+            if window_region:
+                window_x = window_region[0] / self.dpr
+                window_y = window_region[1] / self.dpr
+                scroll_x = window_x + corrected_x
+                scroll_y = window_y + corrected_y
+            else:
+                scroll_x = corrected_x
+                scroll_y = corrected_y
+
+            # 转换为整数坐标
+            scroll_x = int(round(scroll_x))
+            scroll_y = int(round(scroll_y))
+            
+            self.logger.info(f"准备在位置 ({scroll_x}, {scroll_y}) 向下滚动一个单位")
+            
+            # 移动鼠标到滚动位置
+            pyautogui.moveTo(scroll_x, scroll_y, duration=0.1)
+            time.sleep(0.1)
+            
+            # 向下滚动固定一个单位（-1表示向下滚动一次）
+            pyautogui.scroll(-1, x=scroll_x, y=scroll_y)
+            
+            # 等待滚动完成
+            time.sleep(0.3)
+            
+            self.logger.info(f"滚动完成：在 ({scroll_x}, {scroll_y}) 向下滚动了 1 个单位")
+            return True
+            
+        except Exception as e:
+            self.logger.warning(f"滚动操作失败: {e}")
+            return False

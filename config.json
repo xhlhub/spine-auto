@@ -12,7 +12,7 @@
     "Spine Pro",
     "Spine Esoteric Software"
   ],
-  "click_delay": 1.0,
+  "click_delay": 3.0,
   "operation_delay": 0.3,
   "confidence_threshold": 0.93,
   "max_retries": 3,

@@ -12,6 +12,7 @@ import os
 import logging
 import datetime
 import pyautogui
+import platform
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 
@@ -28,8 +29,16 @@ class TemplateManager:
         """
         self.config_manager = config_manager
         self.logger = logging.getLogger(__name__)
-        self.templates_dir = Path("templates")
+        
+        # 根据操作系统选择模板目录
+        if platform.system() == "Windows":
+            self.templates_dir = Path("templates_win")
+        else:
+            self.templates_dir = Path("templates")
+        
+        # 确保模板目录存在
         self.templates_dir.mkdir(exist_ok=True)
+        self.logger.info(f"使用模板目录: {self.templates_dir}")
     
     def take_screenshot(self, region: Optional[Tuple[int, int, int, int]] = None, name: Optional[str] = None) -> np.ndarray:
         """
@@ -76,9 +85,12 @@ class TemplateManager:
             # 新增：将截图保存为本地图片，文件名带时间戳（调试模式下）
             if self.config_manager.get("debug_mode", False) and name:
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-                save_path = f"screenshot_{name}_{timestamp}.png"
-                cv2.imwrite(save_path, screenshot_cv)
-                self.logger.info(f"截图已保存到本地: {save_path}")
+                # 确保logs目录存在
+                logs_dir = Path("logs")
+                logs_dir.mkdir(exist_ok=True)
+                save_path = logs_dir / f"screenshot_{name}_{timestamp}.png"
+                cv2.imwrite(str(save_path), screenshot_cv)
+                self.logger.info(f"截图已保存到logs目录: {save_path}")
 
             return screenshot_cv
             
@@ -472,13 +484,16 @@ class TemplateManager:
             center_y = location[1] + template_h // 2
             cv2.circle(debug_img, (center_x, center_y), 5, (0, 0, 255), -1)
             
-            # 保存调试图像
+            # 保存调试图像到logs目录
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             template_name = os.path.basename(template_path).split('.')[0]
-            debug_path = f"debug_match_{template_name}_{timestamp}.png"
-            cv2.imwrite(debug_path, debug_img)
+            # 确保logs目录存在
+            logs_dir = Path("logs")
+            logs_dir.mkdir(exist_ok=True)
+            debug_path = logs_dir / f"debug_match_{template_name}_{timestamp}.png"
+            cv2.imwrite(str(debug_path), debug_img)
             
-            self.logger.debug(f"调试匹配结果已保存: {debug_path}")
+            self.logger.debug(f"调试匹配结果已保存到logs目录: {debug_path}")
             
         except Exception as e:
             self.logger.error(f"保存调试匹配结果失败: {e}")

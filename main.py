@@ -24,33 +24,37 @@ def main():
         print("\n请选择操作:")
         print("1. 设置模板图片")
         print("2. 运行自动化流程") 
-        print("3. 编辑配置")
-        print("4. 测试点击功能")
-        print("5. 检查系统权限")
-        print("6. 分析模板质量")
-        print("7. 优化匹配设置")
-        print("8. 测试DPR检测")
-        print("9. 调试点击问题")
+        print("3. 📋 运行诊断报告（推荐：发现问题时使用）")
+        print("4. 编辑配置")
+        print("5. 测试点击功能")
+        print("6. 检查系统权限")
+        print("7. 分析模板质量")
+        print("8. 优化匹配设置")
+        print("9. 测试DPR检测")
+        print("10. 调试点击问题")
         print("0. 退出")
         
-        choice = input("请输入选择 (0-9): ").strip()
+        choice = input("请输入选择 (0-10): ").strip()
         
         if choice == "1":
             automation.setup_templates()
         elif choice == "2":
             automation.run_automation()
         elif choice == "3":
+            # 运行诊断报告
+            automation.automation_runner.run_diagnostic_report()
+        elif choice == "4":
             print(f"请编辑配置文件: {automation.config_manager.config_path}")
             input("编辑完成后按回车继续...")
             automation.config_manager.load_config()
-        elif choice == "4":
-            automation.test_click_functionality()
         elif choice == "5":
+            automation.test_click_functionality()
+        elif choice == "6":
             if automation.window_manager.check_accessibility_permissions():
                 print("✅ 辅助功能权限正常")
             else:
                 print("❌ 辅助功能权限不足")
-        elif choice == "6":
+        elif choice == "7":
             # 分析模板质量
             template_files = ["img_filter_icon.png", "img_menu_option.png", "attachment_node.png"]
             print("\n=== 模板质量分析 ===")
@@ -75,13 +79,13 @@ def main():
                 else:
                     print(f"\n❌ {template_file}: 文件不存在")
             input("\n按回车继续...")
-        elif choice == "7":
+        elif choice == "8":
             # 优化匹配设置
             print("\n=== 优化匹配设置 ===")
             automation.template_manager.optimize_template_matching_settings(automation.config_manager)
             print("✅ 匹配设置优化完成")
             input("按回车继续...")
-        elif choice == "8":
+        elif choice == "9":
             # 测试DPR检测
             print("\n=== DPR检测测试 ===")
             print(f"当前检测到的DPR: {automation.click_manager.dpr}")
@@ -119,7 +123,7 @@ def main():
                 print(f"❌ 测试失败: {e}")
             
             input("\n按回车继续...")
-        elif choice == "9":
+        elif choice == "10":
             # 调试点击问题
             print("\n=== 调试点击问题 ===")
             print("请先移动鼠标到您想要测试的位置，然后按回车")

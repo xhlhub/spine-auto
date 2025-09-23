@@ -22,11 +22,20 @@ def install_dependencies():
 
 def create_directories():
     """创建必要的目录"""
+    import platform
+    
     print("正在创建目录结构...")
     try:
-        Path("templates").mkdir(exist_ok=True)
+        # 根据操作系统创建对应的模板目录
+        if platform.system() == "Windows":
+            template_dir = Path("templates_win")
+        else:
+            template_dir = Path("templates")
+        
+        template_dir.mkdir(exist_ok=True)
         Path("logs").mkdir(exist_ok=True)
-        print("✅ 目录创建完成")
+        
+        print(f"✅ 目录创建完成 (模板目录: {template_dir})")
         return True
     except Exception as e:
         print(f"❌ 目录创建失败: {e}")
